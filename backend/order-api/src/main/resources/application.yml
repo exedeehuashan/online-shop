@@ -1,0 +1,12 @@
+spring:
+  application:
+    name: order-api
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+  jackson:
+    deserialization:
+      fail-on-unknown-properties: true
+springdoc:
+  api-docs:
+    path: /v3/api-docs
