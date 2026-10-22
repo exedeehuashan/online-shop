@@ -1,6 +1,6 @@
-# TASK-0001：测试计划
+# TASK-0001：测试计划 / Test Plan
 
-> 本计划描述未来实现的测试策略；当前尚未执行测试。
+> 状态 / Status：`DESIGNED / PENDING_APPROVAL`。本计划描述未来实现的测试策略；当前尚未执行测试。执行须由 tester agent 在人类明确监督下进行。/ This plan describes future testing; no tests have been executed. Execution requires a tester agent under explicit human supervision.
 
 ## 原则
 
@@ -19,6 +19,16 @@
 6. **Playwright E2E（少量）**：创建 -> 查看 -> 确认；创建 -> 取消；失败恢复。
 7. **UAT**：按 User Story 的 Given/When/Then，在类生产 Compose 环境执行。
 8. **压力测试**：读写混合、幂等重放、热点客户、并发状态冲突和稳定性。
+
+## 需求追踪 / Requirements traceability
+
+| Story | 主要层级 / Primary levels | Future issue |
+|---|---|---|
+| US-01 创建 / Create | domain, API, PostgreSQL, idempotency, E2E | #13, #4–#6, #9 |
+| US-02 查询 / View | repository pagination, API ownership, UI/E2E | #14, #5–#6, #8–#9 |
+| US-03 确认 / Confirm | state machine, optimistic lock, event contract | #15, #4, #6–#9 |
+| US-04 取消 / Cancel | state machine, reason validation, event contract, UI | #16, #4, #6–#9 |
+| US-05 质量资产 / Quality assets | integration, contracts, Playwright, UAT, performance | #17, #9–#11 |
 
 ## 核心测试矩阵
 
@@ -50,6 +60,10 @@
 - 单独观测数据库连接、Outbox lag、Kafka publish latency、JVM/GC。
 
 ## 执行门禁
+
+- Gate 0: 人类批准 #2 并将 TASK-0001 由 `PENDING_APPROVAL` 转为 `APPROVED`；此前不得编写或执行实现测试。
+- Gate 1: developer agent 按 TDD 提交失败测试与最小实现 PR；tester agent 独立审查验收映射。
+- Gate 2: 禁止 developer/tester agent 自动合并、部署或使用生产数据；所有活动均需明确人类监督。
 
 - PR：单元、组件、静态检查、架构规则。
 - 合并前：PostgreSQL/Kafka 集成与契约测试。

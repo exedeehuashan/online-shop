@@ -1,6 +1,14 @@
-# TASK-0001：订单模块设计草案
+# TASK-0001：订单模块设计草案 / Order Module Design Draft
 
-> 状态：DESIGNED，等待批准。本文是实现输入，不代表已承诺的公开契约。
+> 状态 / Status：`DESIGNED / PENDING_APPROVAL`。本文是设计输入，不代表已批准的公开契约，也不授权实现。/ This is design input, not an approved public contract or implementation authorization.
+
+## 0. 技术与交付基线 / Technical and delivery baseline
+
+- Backend: Java 17, Spring Boot 3, Maven; PostgreSQL + Flyway（不混用 Liquibase）。
+- Frontend: React + TypeScript, TanStack Router/Query; Playwright for browser acceptance.
+- Infrastructure: Kafka in MVP for outbox delivery; Redis and Elasticsearch deferred from business use; Docker for local/review environments; Kubernetes deferred.
+- Issue #1 remains the separate Catalog bounded context and retains its feature-branch + PR workflow. This Order design neither changes #1 nor creates a dependency on it.
+- Future development/testing is reserved for developer/tester agents after explicit human approval; every change uses a feature branch and PR. No direct `main` commits, auto-merge, deployment, or production change.
 
 ## 1. 架构选择
 
@@ -39,6 +47,18 @@ order interfaces -> application -> domain
 
 - 仅通过显式命令/API 和版本化事件协作。
 - Order 不继承或共享这些上下文的实体。
+
+### 上下文关系 / Context relationships
+
+| 上下文 / Context | Order 目前交互 / Current interaction | 微服务接缝 / Extraction seam |
+|---|---|---|
+| Catalog | MVP 接收不可信商品快照；仅限开发/验收 / accepts an untrusted snapshot for dev/UAT only | `ProductSnapshotProvider` port or versioned API; Order retains its immutable snapshot |
+| Identity | 无集成；受信 fixture 提供 `customerId` / no integration; trusted fixture supplies ID | authenticated principal mapped at web adapter; domain stays identity-provider agnostic |
+| Inventory | 无 / none | reserve/release commands and versioned events; no shared tables |
+| Payment | 无 / none | payment intent/result events; Order state policy composes outcomes |
+| Fulfillment | 无 / none | order-ready/cancelled events; independent lifecycle and database |
+
+Order 独占 `orders`、`order_items`、`order_idempotency` 和 `outbox_events`。其他上下文不得直接读写这些表。/ Order exclusively owns these tables; other contexts must not read or write them directly.
 
 ## 3. 领域模型
 
@@ -120,6 +140,13 @@ order interfaces -> application -> domain
 响应包括 `id, customerId, status, items, total, shippingAddress, version, createdAt, updatedAt`。并发命令建议使用 `If-Match: "<version>"`。
 
 错误使用 `application/problem+json`，字段至少含 `type,title,status,detail,instance,code,violations,correlationId`。建议映射：校验 `400/422`、未找到 `404`、状态/版本/幂等冲突 `409`。
+
+### API 与认证影响 / API and authentication impact
+
+- MVP 的路径级 `customerId` 仅用于本地开发和受控 UAT；Web adapter 必须把它视为不可信输入。/ Path-level `customerId` is only for local development and controlled UAT and is untrusted input.
+- 在公开或生产环境启用前，必须接入认证，把 principal 的 subject 映射为 customer ID，并拒绝 path/principal 不一致。/ Before any public or production use, authentication must map the principal subject to customer ID and reject mismatches.
+- 为避免枚举他人订单，所有“不存在或不属于当前客户”统一返回 `404`；日志不得记录完整地址、电话、token 或幂等请求正文。/ Missing and unauthorized orders both return `404`; sensitive fields must not be logged.
+- 认证接入属于 Web adapter；Order domain 不依赖 Spring Security。/ Authentication belongs in the web adapter; the Order domain remains independent of Spring Security.
 
 ## 7. PostgreSQL / Flyway schema 草案（待批准）
 
@@ -214,6 +241,14 @@ backend/
 
 拆分步骤：冻结契约 -> 独立数据库 ownership -> 通过事件/API 替换模块调用 -> 抽取部署单元 -> consumer contract 测试。禁止跨服务共享数据库表和共享领域实体 jar。
 
+### 可执行边界规则 / Enforceable boundary rules
+
+- `order-domain` only imports JDK types and its own model; no Spring/JPA/Kafka/HTTP classes.
+- `order-application` depends on domain and declares inbound/outbound ports; adapters depend inward.
+- Transactions are started by application orchestration; domain behavior is persistence-agnostic.
+- Cross-context access occurs only through ports or versioned contracts. ArchUnit verifies dependency direction.
+- Extraction readiness requires owned data, stable API/event contracts, consumer contract tests, operational ownership, and an explicit trigger (scale, release cadence, team ownership, or fault isolation).
+
 ## 11. 前端设计
 
 - React + TypeScript + Vite（建议）。
@@ -271,7 +306,7 @@ compose.yaml
 | 状态模型未来不适配支付履约 | 上下文隔离，不把外部状态混入 Order；新规则走策略组合。 |
 | E2E 不稳定 | Testcontainers、确定性 fixture、稳定 selector、等待业务状态而非 sleep。 |
 
-## 16. 建议 GitHub Issues
+## 16. 已建立的技术工作项 / Existing technical work items
 
 仓库已有的 GitHub Issue #1 属于商品目录，不属于本订单模块，以下建议不复用或预设 GitHub 编号；创建时由 GitHub 分配实际编号。共同标签建议：`epic`, `design`, `backend`, `frontend`, `database`, `kafka`, `test`, `devops`, `blocked`, `tdd`。若仓库尚无标签，提交 issue 前先创建。
 
@@ -354,4 +389,30 @@ Review TASK-0001 的 REST API、数据库 schema、状态机、Outbox、Redis/ES
 
 **Body:**
 创建多阶段镜像、非 root 运行、healthcheck 和 Compose；默认 PostgreSQL/Kafka，Redis/ES 为可选 profile。CI 按单元 -> 集成/契约 -> E2E/UAT 顺序运行，压力测试按需触发。
+
+> 上述 A–J 已对应 #3–#11；#12 是 #11 的已关闭重复项。其 GitHub 正文以双语版本为准。/ A–J above map to #3–#11; #12 is the closed duplicate of #11. Their bilingual GitHub bodies are authoritative.
+
+## 17. 路线图与依赖 / Roadmap and dependencies
+
+| Sequence | Deliverable | Issues | Depends on | Gate / Owner |
+|---:|---|---|---|---|
+| 0 | 设计审查与人工批准 / design review and human approval | #2 | 本 PR / this PR | Human approver; state becomes `APPROVED` |
+| 1 | 独立业务故事 / independent business stories | #13–#17 | #2 | Product/UAT acceptance |
+| 2 | 领域与持久化 / domain and persistence | #4, #5 | #2; #5 also depends on #4 | Developer agent under supervision |
+| 3 | API 与事件 / API and events | #6, #7 | #4–#5; #7 depends on #5 | Developer agent under supervision |
+| 4 | React 体验 / React experience | #8 | #6 and stories #13–#16 | Developer agent under supervision |
+| 5 | 集成、契约、E2E / integration, contract, E2E | #9 | #6–#8 | Tester agent under supervision |
+| 6 | UAT 与性能 / UAT and performance | #10 | #9 and stories #13–#17 | Tester agent under supervision |
+| 7 | 容器与 CI 门禁 / containers and CI gates | #11 | #5–#10 as applicable | Developer/tester agents; no deployment |
+
+Dependency flow: `#2 -> (#13–#17) -> #4 -> #5 -> (#6,#7) -> #8 -> #9 -> #10`, with `#11` integrating approved deliverables. #12 is a closed duplicate of #11. #1 remains unrelated and preserved.
+
+## 18. 开放问题 / Open questions for approval
+
+1. 批准 MVP 临时接受客户端商品价格快照，还是必须先提供 Catalog stub/adapter？/ Approve client-supplied price snapshots temporarily, or require a Catalog stub/adapter first?
+2. `customerId` 首期采用 UUID 还是 opaque string，以便未来 Identity 映射？/ Should `customerId` be UUID or opaque string for future Identity mapping?
+3. 创建幂等重放返回 `200` 还是原始 `201`？/ Should a create replay return `200` or the original `201`?
+4. 校验错误统一 `400`，还是语义校验使用 `422`？/ Use `400` for all validation, or `422` for semantic validation?
+5. 订单内重复 SKU 是拒绝还是合并数量？/ Reject duplicate SKUs or merge their quantities?
+6. Kafka 是否为 MVP 必需交付，还是先交付 Outbox 并将 publisher 排到下一增量？/ Is Kafka publishing mandatory in MVP, or should Outbox land first and publisher follow?
 

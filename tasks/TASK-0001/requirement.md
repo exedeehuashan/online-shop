@@ -1,4 +1,12 @@
-# TASK-0001：E-Shop 订单模块需求
+# TASK-0001：E-Shop 订单模块需求 / Order Module Requirements
+
+> 状态 / Status：`DESIGNED / PENDING_APPROVAL`。本文件仅定义需求，不授权开发、测试执行、部署或生产变更。/ This document defines requirements only; it does not authorize development, test execution, deployment, or production changes.
+
+## 基线协调 / Baseline reconciliation
+
+- Issue #1 是独立的商品目录上下文（Java 17、Spring Boot 3、Maven、feature branch + PR），不得改写、关闭或并入本订单任务。/ Issue #1 is the independent Catalog context (Java 17, Spring Boot 3, Maven, feature branch + PR) and must not be rewritten, closed, or absorbed into this Order task.
+- 订单模块沿用其工程基线：Java 17、Spring Boot 3、Maven、PostgreSQL、Flyway；所有后续实现必须在功能分支上通过 PR 审核，禁止直接提交 `main`。/ Order adopts the same engineering baseline: Java 17, Spring Boot 3, Maven, PostgreSQL, and Flyway; all later implementation must use a feature branch and reviewed PR, never direct commits to `main`.
+- Catalog 与 Order 是两个限界上下文；本阶段只设计 Order，不实现 Catalog，也不依赖 #1 完成。/ Catalog and Order are separate bounded contexts; this stage designs Order only and neither implements Catalog nor depends on #1 completing.
 
 ## 目标
 
@@ -24,6 +32,14 @@
 - 管理后台、推荐/搜索商品、Elasticsearch 订单检索。
 - Kubernetes 清单和生产部署。
 - 真正的微服务拆分及跨服务分布式事务。
+
+## 分阶段范围 / Phased scope
+
+| 阶段 / Phase | 范围 / Scope | 决策 / Decision |
+|---|---|---|
+| MVP | Order 领域、REST、PostgreSQL/Flyway、Outbox/Kafka、React/TanStack、Docker、分层测试资产 | 本设计批准后才可启动 / Starts only after design approval |
+| 可选本地 profile / Optional local profile | Redis、Elasticsearch 容器 | 可验证连接但不进入业务关键路径 / Connectivity only, not business-critical path |
+| 延后 / Deferred | Redis 缓存、Elasticsearch 订单搜索、认证授权、Catalog 可信定价、Kubernetes、微服务拆分 | 由独立 ADR/Issue 与风险评估启动 / Requires separate ADR/issue and risk review |
 
 ## 假设与约束
 
@@ -106,4 +122,8 @@
 2. PostgreSQL 表结构和 Flyway 迁移策略。
 3. 模块化单体边界、Kafka Outbox 设计及未来微服务拆分边界。
 4. MVP 暂不实现认证、Redis 缓存和 Elasticsearch 索引的决定。
+5. `customerId` 临时由受信开发夹具传入、严禁公开/生产暴露的安全约束。
+6. MVP 是否允许客户提交价格快照，以及接入 Catalog 前不得公开上线的限制。
+
+任何开发或测试执行只能由后续 developer/tester agents 在人类明确批准和监督下进行。设计批准前，所有实施 Issue 保持 `Blocked / PENDING_APPROVAL`。/ Any development or test execution must be performed later by developer/tester agents under explicit human approval and supervision. Until approval, all implementation issues remain blocked.
 

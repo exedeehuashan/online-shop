@@ -3,12 +3,14 @@
   "title": "E-Shop order module MVP",
   "state": "DESIGNED",
   "approvalRequired": true,
-  "approvalStatus": "PENDING",
+  "approvalStatus": "PENDING_APPROVAL",
   "blockedOn": [
     "REST API approval",
     "database schema approval",
     "module and event boundary approval",
-    "Redis and Elasticsearch deferral approval"
+    "Redis and Elasticsearch deferral approval",
+    "temporary unauthenticated customer identity approval",
+    "client-supplied catalog snapshot risk approval"
   ],
   "artifacts": [
     "requirement.md",
@@ -18,5 +20,9 @@
     "test-result.md"
   ],
   "implementationStarted": false,
-  "testsExecuted": false
+  "testsExecuted": false,
+  "designOnly": true,
+  "humanSupervisionRequired": true,
+  "implementationAuthorized": false,
+  "lastReviewedAgainstIssues": "1-17"
 }
