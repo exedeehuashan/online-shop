@@ -76,8 +76,8 @@
 | Priority / 优先级 | Order / 顺序 | Dependency / 依赖 | Status / 状态 | Coverage / 覆盖 |
 |---|---:|---|---|---|
 | P0 | 3 | #2, #4 | IN_REVIEW / 审核中 | 空库 Flyway migration、约束与双索引 / empty-database migration, constraints, dual indexes |
-| P0 | 3 | #2, #4 | IN_REVIEW / 审核中 | repository round-trip、不可变快照、稳定分页 / repository round-trip, immutable snapshots, stable paging |
-| P0 | 3 | #2, #4 | IN_REVIEW / 审核中 | 幂等同 hash replay/异 hash conflict、乐观锁 / same-hash replay, different-hash conflict, optimistic locking |
+| P0 | 3 | #2, #4 | IN_REVIEW / 审核中 | repository round-trip、数据库强制不可变快照、稳定分页 / repository round-trip, database-enforced immutable snapshots, stable paging |
+| P0 | 3 | #2, #4 | IN_REVIEW / 审核中 | Hibernate/Flyway schema validate、事务安全 replay/conflict、并发幂等、乐观锁 / Hibernate/Flyway schema validation, transaction-safe replay/conflict, concurrent idempotency, optimistic locking |
 | P0 | 3 | #2, #4 | IN_REVIEW / 审核中 | Order mutation + Outbox commit/rollback 原子性 / atomic commit and rollback |
 
 执行命令 / Command：`mvn -B clean verify`。Testcontainers 使用 `postgres:16-alpine`；无 Docker daemon 时明确跳过并记录为环境阻塞，不将跳过误报为集成测试通过。/ Testcontainers uses `postgres:16-alpine`; when no Docker daemon exists it skips explicitly and is recorded as an environmental blocker, never reported as an integration-test pass.

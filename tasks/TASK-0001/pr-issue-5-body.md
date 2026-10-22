@@ -18,18 +18,21 @@ Implements PostgreSQL persistence for the Order bounded context with Flyway-owne
 - Optimistic version updates fail with `OptimisticOrderLockException`; customer paging is stable by `created_at DESC, internal_id DESC`. / 乐观版本冲突抛出明确异常；客户订单按创建时间和内部 ID 稳定倒序分页。
 - `SpringTransactionRunner` composes Order save and Outbox append in one PostgreSQL transaction. / `SpringTransactionRunner` 将订单保存与 Outbox 写入组合在同一个 PostgreSQL 事务中。
 - Hibernate is configured as validation-only (`ddl-auto=validate`, no generated DDL); Flyway owns schema evolution. / Hibernate 仅校验 schema，不生成 DDL；Flyway 独占 schema 演进。
+- Idempotency uses `ON CONFLICT DO NOTHING`, remains usable in the surrounding transaction, and returns the original public order UUID on replay. / 幂等写入使用 `ON CONFLICT DO NOTHING`，不会破坏外围事务，并在重放时返回原订单 public UUID。
+- Database triggers enforce immutable order/item snapshots; explicit Hibernate mappings are validated against the Flyway schema. / 数据库触发器强制订单/订单项快照不可变；显式 Hibernate mappings 对 Flyway schema 执行校验。
 
 ## TDD and verification / TDD 与验证
 
 - Red-test commit / 红灯测试提交: `d33983d`
 - Implementation commit / 实现提交: `93b7883`
+- QA red-test commit / QA 红灯测试提交: `3f55c29`
 - Command / 命令: `mvn -B clean verify`
-- Result / 结果: **BUILD SUCCESS** — 41 total, 35 passed, 6 skipped, 0 failures, 0 errors. / 共 41 项，35 通过，6 跳过，0 失败，0 错误。
-- The six Testcontainers PostgreSQL tests cover empty migration/schema constraints and indexes, repository snapshot round-trip, paging, optimistic locking, idempotency, and Order + Outbox commit/rollback atomicity. / 6 项 Testcontainers PostgreSQL 测试覆盖空库迁移、约束与索引、仓储快照往返、分页、乐观锁、幂等，以及订单 + Outbox 同成同败。
+- Result / 结果: **BUILD SUCCESS** — 45 total, 35 passed, 10 skipped, 0 failures, 0 errors. / 共 45 项，35 通过，10 跳过，0 失败，0 错误。
+- The ten Testcontainers PostgreSQL tests additionally cover executable ORM validation, database-enforced snapshot immutability, in-transaction idempotent replay/conflict, and concurrent claims. / 10 项 Testcontainers PostgreSQL 测试新增覆盖可执行 ORM 校验、数据库强制快照不可变、事务内幂等重放/冲突及并发 claim。
 
 ## Known blocker / 已知阻塞
 
-The current host has Docker CLI 29.9.1 but no running daemon and no `/var/run/docker.sock`. The initial container run failed with `Could not find a valid Docker environment`; therefore PostgreSQL assertions have **not** executed locally and must run in Docker-enabled CI/review before merge. The suite uses `disabledWithoutDocker=true` so non-Docker builds report explicit skips rather than false passes. / 当前主机有 Docker CLI 29.9.1，但 daemon 未运行且不存在 `/var/run/docker.sock`。首次容器运行因找不到有效 Docker 环境而失败，因此 PostgreSQL 断言**尚未在本地执行**，合并前必须在支持 Docker 的 CI/审核环境运行。套件在无 Docker 时明确跳过，绝不将跳过误报为通过。
+The current host has Docker CLI 29.9.1 but no running daemon and no `/var/run/docker.sock`. The container suite therefore skips all ten PostgreSQL assertions locally; they must run in Docker-enabled CI/review before merge. The suite uses `disabledWithoutDocker=true` so skips are explicit rather than false passes. / 当前主机有 Docker CLI 29.9.1，但 daemon 未运行且不存在 `/var/run/docker.sock`。因此本地明确跳过全部 10 项 PostgreSQL 断言，合并前必须在支持 Docker 的 CI/审核环境运行，绝不将跳过误报为通过。
 
 Closes #5
 

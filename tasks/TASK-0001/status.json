@@ -1,7 +1,7 @@
 {
   "taskId": "TASK-0001",
   "title": "E-Shop order module MVP",
-  "state": "DEVELOPING",
+  "state": "IN_REVIEW",
   "approvalRequired": true,
   "approvalStatus": "APPROVED",
   "blockedOn": [],
@@ -38,10 +38,10 @@
   "developerVerification": {
     "command": "mvn -B clean verify",
     "result": "PASS",
-    "tests": 41,
+    "tests": 45,
     "passed": 35,
-    "skipped": 6,
-    "integrationBlocker": "Docker daemon unavailable; six PostgreSQL Testcontainers tests not executed",
+    "skipped": 10,
+    "integrationBlocker": "Docker daemon unavailable; ten PostgreSQL Testcontainers tests, including ORM schema validation and concurrency, not executed",
     "date": "2026-10-22"
   }
 }

@@ -137,3 +137,11 @@ R1 回归补充：边界检测通过集中 code-point predicate 覆盖完整 Uni
 - PostgreSQL 集成 / PostgreSQL integration：**未执行 / NOT EXECUTED**。主机安装 Docker CLI 29.9.1，但 `/var/run/docker.sock` 不存在且 daemon 不运行；原始运行以 `Could not find a valid Docker environment` 失败。套件使用 `disabledWithoutDocker=true`，使非 Docker 环境的普通构建保持可用，同时 Docker/CI 环境会执行全部 6 项。/ Docker CLI 29.9.1 is installed, but `/var/run/docker.sock` is absent and the daemon is not running. The original run failed with `Could not find a valid Docker environment`. `disabledWithoutDocker=true` keeps ordinary non-Docker builds usable while all six tests execute in Docker-enabled CI.
 - 待验证 / Pending evidence：真实 PostgreSQL 上的 migration、constraints/indexes、snapshot round-trip、paging、optimistic locking、idempotency，以及 Order + Outbox commit/rollback。/ Migration, constraints/indexes, snapshot round-trip, paging, optimistic locking, idempotency, and Order + Outbox commit/rollback still require a Docker-enabled run.
 - 空白检查 / Whitespace：`git diff --check` → PASS。
+
+## Issue #5 QA remediation verification / Issue #5 QA 修复验证
+
+- 日期 / Date：2026-10-22；状态流转 / Transition：`FAILED → DEVELOPING → IN_REVIEW_ENVIRONMENT_BLOCKED`。
+- 红灯证据 / Red evidence：`3f55c29`；测试编译按预期因缺少新幂等结果契约与 ORM validator 失败。/ Test compilation failed as expected because the new idempotency result contract and ORM validator did not yet exist.
+- 修复 / Fixes：幂等插入使用 non-erroring conflict strategy，并返回首次订单 public UUID；显式 Hibernate mappings 执行 Flyway schema validation；数据库约束及触发器强化快照不可变性；增加事务内及并发竞争回归。/ Idempotency uses a non-erroring conflict strategy and returns the first order's public UUID; explicit Hibernate mappings validate the Flyway schema; constraints and triggers enforce snapshot immutability; transaction and concurrent-race regressions were added.
+- 定向命令 / Targeted command：`mvn -B -pl backend/order-adapters-persistence -am test -DskipTests=false -Dtest=PostgresPersistenceTest -Dsurefire.failIfNoSpecifiedTests=false` → **BUILD SUCCESS**, 10 total, 10 skipped, 0 failures/errors（Docker unavailable）。
+- 完整命令 / Full command：`mvn -B clean verify` → 见最终验证记录；PostgreSQL assertions remain pending on Docker-enabled CI/review. / See final verification record; PostgreSQL assertions remain pending on Docker-enabled CI/review.

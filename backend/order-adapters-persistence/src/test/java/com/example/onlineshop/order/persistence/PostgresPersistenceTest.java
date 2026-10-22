@@ -47,7 +47,15 @@ class PostgresPersistenceTest {
     assertThat(jdbc.queryForList("select indexname from pg_indexes where schemaname='public'", String.class))
         .contains("ux_orders_public_id", "ix_orders_customer_timeline", "ix_order_items_product_ref", "ix_outbox_aggregate_order");
     assertThatThrownBy(() -> jdbc.update("insert into orders(internal_id) values (1)"));
-    assertThatThrownBy(() -> jdbc.update("update orders set customer_ref=''"));
+    Order order = sample(5, "05050505-0505-0505-0505-050505050505", Instant.parse("2026-10-22T00:00:00Z"));
+    orders.save(order);
+    assertThatThrownBy(() -> jdbc.update("""
+        insert into order_items(internal_id,order_internal_id,product_ref,sku,product_name_snapshot,
+          unit_amount_snapshot,currency,quantity,line_total) values (7,5,'product-2','SKU-2','Case',10,'NZD',2,19)"""));
+    assertThatThrownBy(() -> jdbc.update("""
+        insert into order_idempotency(customer_ref,idempotency_key,request_hash,order_internal_id,order_public_id,created_at)
+        values ('customer-1','invalid-hash',?,5,?,'2026-10-22T00:00:00Z')""",
+        "A".repeat(64), order.id().value()));
   }
 
   @Test void hibernateMappingsValidateAgainstFlywaySchema() {
