@@ -30,7 +30,10 @@ public final class Order {
     Objects.requireNonNull(items, "items");
     if (items.isEmpty()) throw new DomainValidationException(DomainErrorCode.EMPTY_ORDER, "order must contain at least one item");
     HashSet<String> skus = new HashSet<>();
-    for (OrderItem item : items) if (!skus.add(item.sku())) throw new DomainValidationException(DomainErrorCode.DUPLICATE_SKU, "duplicate SKU: " + item.sku());
+    for (OrderItem item : items) {
+      if (item == null) throw Validation.invalid("order item is required");
+      if (!skus.add(item.sku())) throw new DomainValidationException(DomainErrorCode.DUPLICATE_SKU, "duplicate SKU: " + item.sku());
+    }
     this.items = List.copyOf(items);
     this.shippingAddress = Objects.requireNonNull(shippingAddress);
     this.total = items.stream().map(OrderItem::lineTotal).reduce(Money.zeroNzd(), Money::add);

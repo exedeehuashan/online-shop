@@ -2,11 +2,10 @@ package com.example.onlineshop.order.domain;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.util.Objects;
 
 public record Money(BigDecimal amount, String currency) {
   public Money {
-    Objects.requireNonNull(amount, "amount");
+    if (amount == null) throw Validation.invalid("amount is required");
     currency = Validation.required(currency, 3, "currency").toUpperCase();
     if (!"NZD".equals(currency)) throw Validation.invalid("currency must be NZD");
     if (amount.signum() < 0) throw Validation.invalid("amount must be non-negative");
@@ -19,7 +18,7 @@ public record Money(BigDecimal amount, String currency) {
   public static Money zeroNzd() { return nzd(BigDecimal.ZERO); }
 
   public Money add(Money other) {
-    Objects.requireNonNull(other, "other");
+    if (other == null) throw Validation.invalid("money to add is required");
     if (!currency.equals(other.currency)) throw Validation.invalid("currencies must match");
     return new Money(amount.add(other.amount), currency);
   }

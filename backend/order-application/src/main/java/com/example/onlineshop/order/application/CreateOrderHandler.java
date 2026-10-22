@@ -31,12 +31,15 @@ public final class CreateOrderHandler implements CreateOrderUseCase {
 
   private Order create(CreateOrderCommand command) {
     Objects.requireNonNull(command, "command");
-    CreateOrderCommand.Address address = Objects.requireNonNull(command.shippingAddress(), "shippingAddress");
-    List<CreateOrderCommand.Item> requestedItems = Objects.requireNonNull(command.items(), "items");
+    CreateOrderCommand.Address address = required(command.shippingAddress(), "shipping address");
+    List<CreateOrderCommand.Item> requestedItems = required(command.items(), "items");
     OrderInternalId orderInternalId = new OrderInternalId(internalIds.nextId());
-    List<OrderItem> items = requestedItems.stream().map(item -> new OrderItem(
+    List<OrderItem> items = requestedItems.stream().map(rawItem -> {
+      CreateOrderCommand.Item item = required(rawItem, "order item");
+      return new OrderItem(
         new OrderItemInternalId(internalIds.nextId()), new ProductReference(item.productReference()), null,
-        item.sku(), item.productName(), Money.nzd(item.unitPrice()), item.quantity())).toList();
+        item.sku(), item.productName(), Money.nzd(item.unitPrice()), item.quantity());
+    }).toList();
     Order order = Order.create(orderInternalId, new OrderId(publicIds.nextId()),
         new CustomerReference(command.customerReference()), command.customerName(), items,
         new AddressSnapshot(address.recipient(), address.line1(), address.line2(), address.city(), address.region(),
@@ -44,5 +47,10 @@ public final class CreateOrderHandler implements CreateOrderUseCase {
     Order saved = orders.save(order);
     events.appendAll(order.domainEvents());
     return saved;
+  }
+
+  private static <T> T required(T value, String field) {
+    if (value == null) throw new DomainValidationException(DomainErrorCode.INVALID_VALUE, field + " is required");
+    return value;
   }
 }

@@ -31,12 +31,12 @@
   "lastReviewedAgainstIssues": "1-17",
   "lastDesignDecisionDate": "2026-10-22",
   "currentIssue": 4,
-  "currentIssueStatus": "IN_REVIEW",
+  "currentIssueStatus": "DEVELOPING",
   "currentPullRequest": 19,
   "developerVerification": {
-    "command": "mvn test",
+    "command": "mvn -B clean verify",
     "result": "PASS",
-    "tests": 11,
+    "tests": 33,
     "date": "2026-10-22"
   }
 }

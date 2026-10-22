@@ -28,7 +28,9 @@ public final class TimeOrderedIdGenerator implements InternalIdGenerator {
       if (sequence == MAX_SEQUENCE) throw new IllegalStateException("ID sequence exhausted for millisecond " + now);
       sequence++;
     } else {
-      sequence = 0;
+      // Zero is not a valid domain ID. Reserve it at the one instant where every
+      // encoded component is zero, without shifting or overflowing the 63-bit range.
+      sequence = now == EPOCH_MILLIS && nodeId == 0 ? 1 : 0;
       lastMillis = now;
     }
     long elapsed = now - EPOCH_MILLIS;

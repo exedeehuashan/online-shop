@@ -107,3 +107,20 @@
 - 领域模型、状态机、端口注入与模块依赖符合 Issue #4 的架构意图；`mvn clean verify` 通过。/ Domain model, state machine, port injection, and module boundaries meet Issue #4 intent; build is green.
 - 未发现 Critical/High 缺陷，**不阻断合并**；D1–D3 为 Medium，建议修复后再进入 #5/#6。/ No Critical/High defects; D1–D3 are Medium and should be fixed before #5/#6.
 - 未合并 PR，未修改生产代码，未触达 Issue #5–#11 范围。/ PR not merged; no production code changed; Issues #5–#11 untouched.
+
+## D1–D3 修复验证 / D1–D3 remediation verification
+
+- 日期 / Date：2026-10-22
+- 状态流转 / Status transition：`FAILED → DEVELOPING`
+- 命令 / Command：`mvn -B clean verify`
+- 结果 / Result：**BUILD SUCCESS** — 33 tests, 0 failures, 0 errors, 0 skipped（domain 12；application 21）。
+- 回归 / Regression：`KnownDefectsQaTest` 的 3 个缺陷复现已取消 `@Disabled` 并成为常规构建的一部分；另增加 2 个 ID 边界测试。/ All three defect reproductions in `KnownDefectsQaTest` are enabled as normal build regressions; two additional ID boundary tests were added.
+- 空白检查 / Whitespace：`git diff --check` → **PASS**。
+
+| ID | 修复结果 / Resolution | 状态 / Status |
+|---|---|---|
+| D1 | epoch/node 0 首个 ID 为 `1`，后续不重复；最大支持时间仍在正 63-bit 范围，越界 fail-closed。/ First ID is `1` with no duplicate; maximum supported time stays positive 63-bit and overflow fails closed. | Fixed |
+| D2 | null item/null unit price 抛 `DomainValidationException(INVALID_VALUE)`，不再泄漏 NPE。/ Null item/unit price raises the domain validation error rather than leaking NPE. | Fixed |
+| D3 | opaque reference 对空白和首尾空格显式拒绝，合法值原样保留。/ Blank or surrounding whitespace is explicitly rejected and valid opaque values are preserved. | Fixed |
+
+修复严格限于 Issue #4；未触碰 Issues #5–#11，PR #19 未合并。/ Remediation is strictly scoped to Issue #4; Issues #5–#11 are untouched and PR #19 remains unmerged.

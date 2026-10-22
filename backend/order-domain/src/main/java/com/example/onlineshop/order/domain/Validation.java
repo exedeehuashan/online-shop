@@ -18,6 +18,13 @@ final class Validation {
     return normalized;
   }
 
+  static String requiredOpaque(String value, int maxLength, String field) {
+    if (value == null || value.isBlank()) throw invalid(field + " is required");
+    if (!value.equals(value.trim())) throw invalid(field + " must not have leading or trailing whitespace");
+    if (value.length() > maxLength) throw invalid(field + " exceeds " + maxLength + " characters");
+    return value;
+  }
+
   static DomainValidationException invalid(String message) {
     return new DomainValidationException(DomainErrorCode.INVALID_VALUE, message);
   }

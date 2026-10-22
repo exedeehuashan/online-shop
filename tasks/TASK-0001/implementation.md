@@ -17,8 +17,15 @@
 
 ## Issue #4 implementation / Issue #4 实施
 
-- 状态 / Status：`IN_REVIEW / 审核中`。
+- 状态 / Status：`DEVELOPING / 开发中`（PR #19 独立 QA 的 `FAILED` 后修复 D1–D3）。/ Remediation of D1–D3 after PR #19 independent QA moved the work from `FAILED` back to `DEVELOPING`.
 - 范围 / Scope：建立 Java 17 Maven 多模块基线、纯 Java `Order` 聚合、Money/地址/订单项/引用值对象、状态机、领域事件、入站用例与出站端口、Clock/UUID/63-bit 时间有序 ID 注入，以及 ArchUnit 依赖方向规则。/ Established the Java 17 Maven multi-module baseline, pure-Java `Order` aggregate, Money/address/item/reference value objects, state machine, domain events, inbound use cases and outbound ports, injected Clock/UUID/63-bit time-ordered IDs, and ArchUnit dependency-direction rules.
 - TDD 证据 / TDD evidence：先增加引用尚不存在生产类型的行为测试；首次 Maven 红灯在依赖引导阶段中止，随后以最小领域与应用实现转绿；开发者验证命令为 `mvn test`。/ Behavior tests referencing not-yet-existing production types were added first; the initial red Maven run stopped during dependency bootstrap, followed by the minimum domain/application implementation to reach green; developer verification command: `mvn test`.
 - 边界 / Boundaries：未实现 PostgreSQL/Flyway、REST、Spring、JPA、Kafka publisher、Web UI、Docker 或后续 Issue #5–#11。事务端口已定义，真实事务适配器留给持久化增量。/ No PostgreSQL/Flyway, REST, Spring, JPA, Kafka publisher, web UI, Docker, or later Issue #5–#11 work was implemented. A transaction port is defined; its real adapter remains for the persistence increment.
 - 交付 / Delivery：功能分支 `feat/issue-4-order-domain-application`，PR #19 等待人工审核，不自动合并。/ Feature branch `feat/issue-4-order-domain-application`; PR #19 awaits human review with no automatic merge.
+
+### PR #19 QA remediation / PR #19 QA 修复
+
+- D1：epoch/node 0 的首个 ID 显式跳过保留值 `0`；最大 41-bit 时间边界仍保持正 63-bit，且补充首两个 ID、序列耗尽、最大/越界时间测试。/ The first epoch/node-0 ID skips reserved value `0`; the maximum 41-bit time boundary remains a positive 63-bit value, with regression coverage for the first two IDs, sequence exhaustion, and maximum/out-of-range timestamps.
+- D2：空订单项及空单价等语义非法输入统一转为 `DomainValidationException(INVALID_VALUE)`，为未来 REST `422` 映射保留稳定契约。/ Semantically invalid null order items and unit prices now consistently raise `DomainValidationException(INVALID_VALUE)`, preserving a stable contract for future REST `422` mapping.
+- D3：opaque 客户/商品引用不再静默 trim；空白值及含首尾空格的值均显式拒绝，避免标识碰撞。/ Opaque customer/product references are no longer silently trimmed; blank values and surrounding whitespace are explicitly rejected to prevent identifier collisions.
+- 范围仍严格限于 Issue #4；未实现或修改 Issues #5–#11，未合并 PR。/ Scope remains strictly limited to Issue #4; Issues #5–#11 were not implemented or changed, and the PR was not merged.
