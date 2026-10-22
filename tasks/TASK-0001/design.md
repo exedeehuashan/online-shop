@@ -6,7 +6,7 @@
 
 - Backend: Java 17, Spring Boot 3, Maven; PostgreSQL + Flyway（不混用 Liquibase）。
 - Frontend: React + TypeScript, TanStack Router/Query; Playwright for browser acceptance.
-- Infrastructure: Kafka in MVP for outbox delivery; Redis and Elasticsearch deferred from business use; Docker for local/review environments; Kubernetes deferred.
+- Infrastructure: PostgreSQL Transactional Outbox in MVP; Kafka publisher, Redis, and Elasticsearch business use are deferred; Docker for local/review environments; Kubernetes deferred.
 - Issue #1 remains the separate Catalog bounded context and retains its feature-branch + PR workflow. This Order design neither changes #1 nor creates a dependency on it.
 - Future development/testing is reserved for developer/tester agents after explicit human approval; every change uses a feature branch and PR. No direct `main` commits, auto-merge, deployment, or production change.
 
@@ -26,7 +26,7 @@ order interfaces -> application -> domain
                     /     |       \
               PostgreSQL Outbox  future adapters
                               |
-                            Kafka
+                    future Kafka publisher
 ```
 
 依赖方向：`interfaces -> application -> domain`；`infrastructure` 实现 domain/application 定义的端口。使用组合对象（Money、Address、OrderItem）而非继承式基础实体。
@@ -41,7 +41,7 @@ order interfaces -> application -> domain
 ### Catalog（外部/未来）
 
 - 拥有 SKU、商品名称和当前售价。
-- MVP 由调用方提交商品快照；下一阶段以 `ProductSnapshotProvider` 端口替换，订单依旧保存快照。
+- MVP 临时由调用方提交商品快照；仅用于受控开发/UAT。下一阶段以可信 `ProductSnapshotProvider`/定价端口替换，订单仍永久保存成交快照。
 
 ### Inventory / Payment / Fulfillment / Identity（未来）
 
@@ -64,8 +64,9 @@ Order 独占 `orders`、`order_items`、`order_idempotency` 和 `outbox_events`�
 
 ### 聚合根 `Order`
 
-- `OrderId`（UUID）
-- `CustomerId`（字符串/UUID value object；待 Identity 决定）
+- `OrderId`（对外 UUID）与 `OrderInternalId`（内部 63-bit 时间有序 ID；不出现在公开契约）
+- `CustomerReference`（对外 UUID 或 opaque string，最长 128；不假设可解析）与可空的未来 `customerInternalId`
+- `CustomerNameSnapshot`（创建时快照，不随 Identity 主数据变化）
 - `status: OrderStatus`
 - `items: List<OrderItem>`
 - `shippingAddress: AddressSnapshot`
@@ -76,15 +77,16 @@ Order 独占 `orders`、`order_items`、`order_idempotency` 和 `outbox_events`�
 
 ### 值对象/实体
 
-- `OrderItem`：`orderItemId`, `productId`, `sku`, `productName`, `unitPrice: Money`, `quantity`, `lineTotal`。
+- `OrderItem`：内部时间有序 `orderItemId`、对外 `productReference`、可空的未来 `productInternalId`、`sku`、不可变 `productNameSnapshot`、`unitPriceSnapshot: Money`、`quantity`、`lineTotal`。
 - `Money`：`amount + currency`，封装加法/乘法与舍入规则。
 - `AddressSnapshot`：收件人、地址行、城市、地区、邮编、国家代码、电话（敏感字段日志脱敏）。
 - 应用服务组合 `Clock`、`IdGenerator`、`OrderRepository`、`OutboxRepository` 等接口，便于确定性测试。
 
 ### 不变量
 
-- 订单至少一项；SKU 在单一订单内是否允许重复：建议拒绝重复并返回校验错误。
+- 订单至少一项；订单创建/结算 API 中重复 SKU 必须拒绝并返回 `422 DUPLICATE_SKU`。购物车/提交页只在发送 API 前合并数量；Order 后端不承担购物车职责。
 - 所有订单项币种一致且为 NZD；总额等于行小计之和。
+- 客户、地址、商品名称和单价均为成交时不可变快照；之后源系统变更不得回写历史订单。更正只能通过显式审计用例，MVP 不提供该用例。
 - 状态变化只能调用领域行为，禁止任意 setter。
 - 状态更新与 Outbox 写入同一个 PostgreSQL 事务。
 
@@ -117,7 +119,7 @@ Order 独占 `orders`、`order_items`、`order_idempotency` 和 `outbox_events`�
 
 | 方法 | 路径 | 行为 | 成功响应 |
 |---|---|---|---|
-| POST | `/api/v1/customers/{customerId}/orders` | 创建；必需 `Idempotency-Key` | `201` + Location；幂等重放可 `200` |
+| POST | `/api/v1/customers/{customerId}/orders` | 创建；必需 `Idempotency-Key` | 首次 `201` + Location；相同载荷幂等重放 `200` |
 | GET | `/api/v1/customers/{customerId}/orders/{orderId}` | 获取详情 | `200` |
 | GET | `/api/v1/customers/{customerId}/orders?page=0&size=20` | 分页列表 | `200` |
 | POST | `.../{orderId}/confirmation` | 确认 | `200` |
@@ -127,6 +129,7 @@ Order 独占 `orders`、`order_items`、`order_idempotency` 和 `outbox_events`�
 
 ```json
 {
+  "customerName": "Example Customer",
   "items": [
     {"productId": "uuid", "sku": "PHONE-001", "name": "Phone", "unitPrice": {"amount": "999.00", "currency": "NZD"}, "quantity": 1}
   ],
@@ -137,9 +140,9 @@ Order 独占 `orders`、`order_items`、`order_idempotency` 和 `outbox_events`�
 }
 ```
 
-响应包括 `id, customerId, status, items, total, shippingAddress, version, createdAt, updatedAt`。并发命令建议使用 `If-Match: "<version>"`。
+响应包括 `id, customerId, customerName, status, items, total, shippingAddress, version, createdAt, updatedAt`；仅暴露 public IDs，不暴露内部 BIGINT IDs。并发命令建议使用 `If-Match: "<version>"`。
 
-错误使用 `application/problem+json`，字段至少含 `type,title,status,detail,instance,code,violations,correlationId`。建议映射：校验 `400/422`、未找到 `404`、状态/版本/幂等冲突 `409`。
+错误使用 `application/problem+json`，字段至少含 `type,title,status,detail,instance,code,violations,correlationId`。映射：JSON/类型等语法解析失败 `400`；语法正确但违反字段或领域约束（含重复 SKU）统一 `422`；未找到 `404`；状态/版本/幂等键异载荷冲突 `409`。
 
 ### API 与认证影响 / API and authentication impact
 
@@ -152,8 +155,11 @@ Order 独占 `orders`、`order_items`、`order_idempotency` 和 `outbox_events`�
 
 ```text
 orders
-  id uuid PK
-  customer_id varchar(64) NOT NULL
+  internal_id bigint PK                # 应用生成的 63-bit 时间有序 ID
+  public_id uuid NOT NULL UNIQUE        # API orderId
+  customer_ref varchar(128) NOT NULL    # UUID/opaque string，原样保存
+  customer_internal_id bigint NULL      # 未来 Identity 映射；MVP 不填充/不做 FK
+  customer_name_snapshot varchar(200) NOT NULL
   status varchar(32) NOT NULL CHECK (...)
   currency char(3) NOT NULL
   total_amount numeric(19,2) NOT NULL CHECK (total_amount >= 0)
@@ -171,47 +177,52 @@ orders
   updated_at timestamptz NOT NULL
 
 order_items
-  id uuid PK
-  order_id uuid NOT NULL FK orders(id)
-  product_id uuid NOT NULL
+  internal_id bigint PK
+  order_internal_id bigint NOT NULL FK orders(internal_id)
+  product_ref varchar(128) NOT NULL
+  product_internal_id bigint NULL       # 未来 Catalog 映射；MVP 不填充/不做 FK
   sku varchar(100) NOT NULL
-  product_name varchar(300) NOT NULL
-  unit_amount numeric(19,2) NOT NULL
+  product_name_snapshot varchar(300) NOT NULL
+  unit_amount_snapshot numeric(19,2) NOT NULL
   currency char(3) NOT NULL
   quantity integer NOT NULL CHECK (quantity > 0)
   line_total numeric(19,2) NOT NULL
-  UNIQUE(order_id, sku)
+  UNIQUE(order_internal_id, sku)
 
 order_idempotency
-  customer_id varchar(64) NOT NULL
+  customer_ref varchar(128) NOT NULL
   idempotency_key varchar(128) NOT NULL
   request_hash char(64) NOT NULL
-  order_id uuid NOT NULL
+  order_internal_id bigint NOT NULL FK orders(internal_id)
   created_at timestamptz NOT NULL
-  PRIMARY KEY(customer_id, idempotency_key)
+  PRIMARY KEY(customer_ref, idempotency_key)
 
 outbox_events
-  id uuid PK
+  internal_id bigint PK
+  event_id uuid NOT NULL UNIQUE
   aggregate_type varchar(100) NOT NULL
-  aggregate_id uuid NOT NULL
+  aggregate_public_id uuid NOT NULL
+  aggregate_internal_id bigint NOT NULL
   event_type varchar(150) NOT NULL
   event_version integer NOT NULL
   payload jsonb NOT NULL
   occurred_at timestamptz NOT NULL
-  published_at timestamptz NULL
-  attempts integer NOT NULL DEFAULT 0
+  published_at timestamptz NULL         # 为未来 publisher 保留，本增量不更新
+  attempts integer NOT NULL DEFAULT 0   # 为未来 publisher 保留
 ```
 
-索引：`orders(customer_id, created_at DESC, id DESC)`、`order_items(order_id)`、未发布 outbox 的部分索引。Flyway migrations 位于后端资源目录；测试用 Testcontainers 运行真实迁移。JPA schema generation 设为 validate。
+ID 实施方案：应用层 `TimeOrderedIdGenerator` 生成正数 63-bit ID（时间戳 + 配置的 node id + 毫秒内 sequence），通过端口注入并用固定时钟测试；部署必须为每个并发节点分配唯一 node id，时钟回拨时 fail-closed。它不依赖 PostgreSQL 扩展，也不进入公开 API。公开 UUID 由独立 `PublicIdGenerator` 生成。未来可替换生成器而不改变领域/API。
 
-## 8. Kafka 与事件
+双索引：`orders(customer_ref, created_at DESC, internal_id DESC)` 支持客户时间线，`orders(public_id)` 唯一索引支持 API 定位；`order_items(order_internal_id)` 支持内部关联，`order_items(product_ref)` 支持审计；`outbox_events(aggregate_internal_id, occurred_at)` 支持聚合顺序，并保留未发布部分索引供未来 publisher 使用。冗余字段只用于查询/历史事实，不作为跨上下文同步副本；订单写入后快照不可变。
 
-- 使用 Transactional Outbox 避免数据库提交与 Kafka 发布的双写不一致。
-- Topic 建议 `eshop.order.events.v1`，key=`orderId` 保障同订单内有序。
+## 8. Transactional Outbox 与未来 Kafka
+
+- MVP 仅要求订单变更与版本化事件在同一 PostgreSQL 事务写入 Transactional Outbox；不实现 Kafka publisher、重试或 broker 集成。
+- 下一增量的 Topic 建议 `eshop.order.events.v1`，key=`orderId` 保障同订单内有序；届时单独审批运行语义。
 - 事件 envelope：`eventId,eventType,eventVersion,aggregateId,occurredAt,correlationId,payload`。
 - 事件：`OrderCreated.v1`、`OrderConfirmed.v1`、`OrderCancelled.v1`。
-- 投递语义为至少一次；消费者必须按 `eventId` 幂等。Schema 演进遵循向后兼容，首期 JSON；后续评估 Schema Registry。
-- 本地 Docker 可启动 Kafka；应用允许 profile 禁用 publisher，核心测试不依赖 broker。
+- Outbox 写入保证“事件意图不丢失”，不代表本 MVP 已投递。未来 publisher 采用至少一次投递，消费者按 `eventId` 幂等。
+- 本地 Compose 的 Kafka 仅可选 profile；MVP CI 与验收不依赖 broker。
 
 ## 9. Redis 与 Elasticsearch 决策
 
@@ -281,7 +292,7 @@ compose.yaml
 ## 13. Docker
 
 - 后端、前端使用多阶段构建、非 root 用户和 healthcheck。
-- Compose 默认启动 app、web、PostgreSQL、Kafka；Redis/Elasticsearch 用 profiles 按需启动。
+- Compose 默认启动 app、web、PostgreSQL；Kafka、Redis、Elasticsearch 用 profiles 按需启动。
 - 不固定宿主机私密配置；使用环境变量和本地 secrets 文件（gitignored）。
 - 生产镜像不可含测试工具；K8s 在后期以独立部署工件引入。
 
@@ -290,7 +301,7 @@ compose.yaml
 1. ADR-001：模块化单体优先，定义拆分触发条件。
 2. ADR-002：六边形架构和领域层纯 Java。
 3. ADR-003：PostgreSQL + Flyway，禁用自动 schema 更新。
-4. ADR-004：Transactional Outbox 与 Kafka 至少一次投递。
+4. ADR-004：MVP Transactional Outbox；Kafka publisher 延后及未来至少一次投递。
 5. ADR-005：Redis/Elasticsearch 推迟到有数据证明的场景。
 6. ADR-006：API 幂等、乐观锁和 Problem Details。
 
@@ -300,8 +311,9 @@ compose.yaml
 |---|---|
 | 客户端提交价格可被篡改 | MVP 限测试用途；接入 Catalog 时服务端获取可信快照，公开部署前必须修复。 |
 | 无认证造成越权 | 仅开发环境；上线前 Identity/Auth 是阻断项。 |
-| Kafka 重复/乱序 | aggregate key、有版本事件、消费端幂等。 |
-| Outbox 积压 | 指标、重试/退避、死信/人工重放流程。 |
+| Outbox 尚未发布 | 明确 MVP 只保证同事务落库；Kafka publisher 作为下一增量，不宣称事件已送达。 |
+| 内部 ID 冲突/时钟回拨 | 唯一 node id、数据库 PK 兜底、时钟回拨 fail-closed、生成器并发测试。 |
+| 冗余快照与源系统不一致 | 订单快照代表成交历史并保持不可变；未来可信端口只决定创建瞬间数据，不回写历史。 |
 | 过早引入 Redis/ES 增加复杂度 | 首期延后，保留适配器边界和可选 Compose profile。 |
 | 状态模型未来不适配支付履约 | 上下文隔离，不把外部状态混入 Order；新规则走策略组合。 |
 | E2E 不稳定 | Testcontainers、确定性 fixture、稳定 selector、等待业务状态而非 sleep。 |
@@ -328,7 +340,7 @@ Review TASK-0001 的 REST API、数据库 schema、状态机、Outbox、Redis/ES
 
 ### 建议 C — `[BACKEND] Bootstrap order domain and application layer`
 
-**Labels:** `backend`, `tdd`, `blocked`  
+**Labels:** `backend`, `tdd`, `blocked`
 **Dependencies:** 建议 B。
 
 **Body:**
@@ -350,13 +362,14 @@ Review TASK-0001 的 REST API、数据库 schema、状态机、Outbox、Redis/ES
 **Body:**
 实现创建/查询/列表/确认/取消 API、Problem Details、Idempotency-Key、If-Match 和 OpenAPI。验收覆盖成功、校验、404、409 与幂等重放。
 
-### 建议 F — `[KAFKA] Publish order events via transactional outbox`
+### 建议 F — `[OUTBOX] Persist order events transactionally`
 
-**Labels:** `backend`, `kafka`, `tdd`, `blocked`  
+**Labels:** `backend`, `tdd`, `blocked`
+
 **Dependencies:** 建议 B、D。
 
 **Body:**
-在同事务写 Outbox，并以后台 publisher 发布版本化事件到 Kafka。增加重试、指标和 Testcontainers 集成测试；验证重复投递假设。
+在同一 PostgreSQL 事务写入版本化 Outbox envelope，并以 Testcontainers 验证原子性、唯一性和快照。Kafka publisher、broker、重试与投递语义延后到下一增量。
 
 ### 建议 G — `[FRONTEND] Build React order workflows`
 
@@ -388,7 +401,7 @@ Review TASK-0001 的 REST API、数据库 schema、状态机、Outbox、Redis/ES
 **Dependencies:** 建议 D、E、G；Kafka profile 与建议 F 协同。
 
 **Body:**
-创建多阶段镜像、非 root 运行、healthcheck 和 Compose；默认 PostgreSQL/Kafka，Redis/ES 为可选 profile。CI 按单元 -> 集成/契约 -> E2E/UAT 顺序运行，压力测试按需触发。
+创建多阶段镜像、非 root 运行、healthcheck 和 Compose；默认 PostgreSQL，Kafka/Redis/ES 为可选 profile。CI 按单元 -> 集成/契约 -> E2E/UAT 顺序运行，压力测试按需触发。
 
 > 上述 A–J 已对应 #3–#11；#12 是 #11 的已关闭重复项。其 GitHub 正文以双语版本为准。/ A–J above map to #3–#11; #12 is the closed duplicate of #11. Their bilingual GitHub bodies are authoritative.
 
@@ -407,12 +420,15 @@ Review TASK-0001 的 REST API、数据库 schema、状态机、Outbox、Redis/ES
 
 Dependency flow: `#2 -> (#13–#17) -> #4 -> #5 -> (#6,#7) -> #8 -> #9 -> #10`, with `#11` integrating approved deliverables. #12 is a closed duplicate of #11. #1 remains unrelated and preserved.
 
-## 18. 开放问题 / Open questions for approval
+## 18. 用户已确认的设计决策 / User-confirmed design decisions
 
-1. 批准 MVP 临时接受客户端商品价格快照，还是必须先提供 Catalog stub/adapter？/ Approve client-supplied price snapshots temporarily, or require a Catalog stub/adapter first?
-2. `customerId` 首期采用 UUID 还是 opaque string，以便未来 Identity 映射？/ Should `customerId` be UUID or opaque string for future Identity mapping?
-3. 创建幂等重放返回 `200` 还是原始 `201`？/ Should a create replay return `200` or the original `201`?
-4. 校验错误统一 `400`，还是语义校验使用 `422`？/ Use `400` for all validation, or `422` for semantic validation?
-5. 订单内重复 SKU 是拒绝还是合并数量？/ Reject duplicate SKUs or merge their quantities?
-6. Kafka 是否为 MVP 必需交付，还是先交付 Outbox 并将 publisher 排到下一增量？/ Is Kafka publishing mandatory in MVP, or should Outbox land first and publisher follow?
+1. MVP 临时接受客户端商品/价格快照，仅限受控开发/UAT；可信 Catalog/定价端口是公开上线阻断项。/ Temporarily accept client product/price snapshots for controlled dev/UAT; a trusted Catalog/pricing port blocks public launch.
+2. API 使用 UUID/opaque references；大型表使用应用生成的时间有序 BIGINT internal IDs，并保留双字段/双索引。/ Use UUID/opaque API references plus application-generated time-ordered BIGINT internal IDs and dual fields/indexes for large tables.
+3. 创建幂等重放返回 `200`；首次创建返回 `201`。/ Return `200` for create replay and `201` for first creation.
+4. 语义校验统一 `422`；请求无法解析为 `400`。/ Use `422` for semantic validation and `400` for unparseable requests.
+5. 购物车/提交页合并重复 SKU；订单创建/结算 API 拒绝重复 SKU。当前模块只负责后者。/ Merge duplicate SKUs in cart/review UI; reject them at order create/checkout API. This module owns only the latter boundary.
+6. MVP 仅实现 Transactional Outbox；Kafka publisher 延后。/ MVP implements Transactional Outbox only; defer the Kafka publisher.
+7. 客户、地址、商品名称与单价保存成交快照并保持不可变，以空间换取查询时间和服务解耦。/ Persist immutable customer, address, product-name, and unit-price snapshots to trade storage for query speed and service decoupling.
+
+上述选择已由用户确认，但因其涉及 API、schema 与架构，PR #18 仍需整体明确批准后才能实施。/ These choices are user-confirmed, but PR #18 still requires explicit overall approval before implementation because they affect API, schema, and architecture.
 

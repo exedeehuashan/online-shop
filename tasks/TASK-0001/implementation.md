@@ -9,7 +9,9 @@
 
 ## Approval record / 批准记录
 
-批准时必须记录：批准人/日期、API 与认证选择、数据库 schema/Flyway 决策、模块/事件边界、Kafka MVP 范围、Redis/Elasticsearch 延后策略，以及开放问题的结论。/ Approval must record approver/date, API and auth choices, database schema/Flyway decision, module/event boundaries, Kafka MVP scope, Redis/Elasticsearch deferral, and all open-question decisions.
+批准时必须记录：批准人/日期、API 与认证选择、数据库 schema/Flyway 决策、模块/事件边界、Outbox-only MVP/Kafka publisher 延后、Redis/Elasticsearch 延后策略，以及已确认设计决策。/ Approval must record approver/date, API and auth choices, database schema/Flyway decision, module/event boundaries, Outbox-only MVP/Kafka publisher deferral, Redis/Elasticsearch deferral, and the confirmed design decisions.
 
-当前批准记录 / Current approval record：**None / 无**。
+当前决策记录 / Current decision record（2026-10-22）：用户已确认客户端临时价格快照、public/opaque + internal time-ordered 双 ID、重放 `200`、语义错误 `422`、购物车合并而订单 API 拒绝重复 SKU、仅 Transactional Outbox、不可变冗余快照。/ The user confirmed temporary client price snapshots, public/opaque plus internal time-ordered IDs, replay `200`, semantic `422`, cart-side merge with order-API duplicate rejection, Transactional Outbox only, and immutable redundant snapshots.
+
+整体实施批准 / Overall implementation approval：**None / 无**。PR #18 与 Issue #2 仍须明确批准后才能开始开发。/ PR #18 and Issue #2 still require explicit approval before development starts.
 

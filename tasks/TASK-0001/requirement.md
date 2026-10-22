@@ -22,7 +22,7 @@
 - React 订单创建、订单列表、订单详情界面。
 - PostgreSQL + Flyway；Docker Compose 本地运行。
 - 单元、组件/集成、API、端到端、UAT、压力测试的目录与基线。
-- Kafka 订单事件的可靠发布设计（Transactional Outbox）。
+- Transactional Outbox 的可靠事件落库；Kafka 发布器延后到下一增量。
 
 ## 非范围（MVP）
 
@@ -45,9 +45,12 @@
 
 - 首期币种固定为 `NZD`；金额以 `numeric(19,2)` 持久化，Java 使用 `BigDecimal`。
 - 商品名称、SKU、单价在下单时固化为订单项快照；由于商品模块不在范围内，MVP 请求暂时携带该快照。
+- 客户端价格快照仅临时用于受控开发/UAT；公开或生产使用前必须由 Catalog/定价端口提供可信快照。
+- 对外 API 使用不可推断的 UUID/opaque string；大型表同时保存应用生成的 63-bit 时间有序内部 ID，用于主键、关联、范围查询和归档。MVP 不依赖 PostgreSQL 扩展。
+- 订单保存客户名称、商品名称/单价等成交时快照；快照创建后不可随源数据变化，避免跨上下文 JOIN。
 - 同一客户使用 `Idempotency-Key` 创建订单，重复请求返回原订单。
 - 所有时间为 UTC，API 使用 ISO-8601。
-- 订单项数量必须为正整数；单价不得为负；订单至少包含一项。
+- 订单项数量必须为正整数；单价不得为负；订单至少包含一项。购物车/提交页可在本地合并重复 SKU；订单创建/结算 API 必须拒绝重复 SKU。
 - 首期不承诺库存和支付成功，状态只表达订单自身生命周期。
 - 遵循 TDD、DDD、Favor composition over inheritance；领域层不依赖 Spring/JPA/Kafka。
 
@@ -80,9 +83,9 @@
 作为客户，我希望提交商品和收货信息创建订单，以便后续确认购买。
 
 - Given 合法且至少一项商品；When 创建订单；Then 返回 `201`、`DRAFT` 订单及正确总额。
-- Given 相同客户、相同 `Idempotency-Key` 和相同请求；When 重试；Then 返回原订单且不重复入库/发事件。
+- Given 相同客户、相同 `Idempotency-Key` 和相同请求；When 重试；Then 返回 `200` 与原订单，且不重复入库/写 Outbox。
 - Given 同一键但载荷不同；Then 返回 `409`。
-- Given 非法数量、价格、币种或空订单项；Then 返回 `400/422` 且无数据写入。
+- Given 语法正确但数量、价格、币种、重复 SKU 或订单项不合法；Then 返回 `422` 且无数据写入。无法解析的请求仍返回 `400`。
 
 ### US-02 查询订单
 
@@ -120,10 +123,10 @@
 
 1. REST API 路径与错误/幂等语义。
 2. PostgreSQL 表结构和 Flyway 迁移策略。
-3. 模块化单体边界、Kafka Outbox 设计及未来微服务拆分边界。
+3. 模块化单体边界、Transactional Outbox 设计及未来微服务拆分边界；Kafka publisher 本增量延后。
 4. MVP 暂不实现认证、Redis 缓存和 Elasticsearch 索引的决定。
-5. `customerId` 临时由受信开发夹具传入、严禁公开/生产暴露的安全约束。
-6. MVP 是否允许客户提交价格快照，以及接入 Catalog 前不得公开上线的限制。
+5. 对外 UUID/opaque ID、内部时间有序 ID、双索引和快照冗余策略，以及临时未认证 customer reference 的安全约束。
+6. 临时客户端价格快照以及接入可信 Catalog/定价端口前不得公开上线的限制。
 
 任何开发或测试执行只能由后续 developer/tester agents 在人类明确批准和监督下进行。设计批准前，所有实施 Issue 保持 `Blocked / PENDING_APPROVAL`。/ Any development or test execution must be performed later by developer/tester agents under explicit human approval and supervision. Until approval, all implementation issues remain blocked.
 

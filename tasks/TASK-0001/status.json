@@ -5,12 +5,16 @@
   "approvalRequired": true,
   "approvalStatus": "PENDING_APPROVAL",
   "blockedOn": [
-    "REST API approval",
-    "database schema approval",
-    "module and event boundary approval",
-    "Redis and Elasticsearch deferral approval",
-    "temporary unauthenticated customer identity approval",
-    "client-supplied catalog snapshot risk approval"
+    "explicit overall approval of PR #18 and Issue #2"
+  ],
+  "confirmedDesignDecisions": [
+    "temporary client-supplied price snapshots for controlled dev/UAT",
+    "opaque public references plus time-ordered bigint internal IDs and dual indexes",
+    "idempotent create replay returns 200",
+    "semantic validation returns 422",
+    "cart UI merges duplicate SKUs while order create API rejects them",
+    "transactional outbox only; Kafka publisher deferred",
+    "immutable customer, address, product-name and unit-price snapshots"
   ],
   "artifacts": [
     "requirement.md",
@@ -24,5 +28,6 @@
   "designOnly": true,
   "humanSupervisionRequired": true,
   "implementationAuthorized": false,
-  "lastReviewedAgainstIssues": "1-17"
+  "lastReviewedAgainstIssues": "1-17",
+  "lastDesignDecisionDate": "2026-10-22"
 }
