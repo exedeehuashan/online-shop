@@ -7,6 +7,7 @@ import com.example.onlineshop.order.domain.*;
 import java.math.BigDecimal;
 import java.time.*;
 import java.util.*;
+import java.util.concurrent.*;
 import javax.sql.DataSource;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.BeforeAll;
@@ -46,6 +47,11 @@ class PostgresPersistenceTest {
     assertThat(jdbc.queryForList("select indexname from pg_indexes where schemaname='public'", String.class))
         .contains("ux_orders_public_id", "ix_orders_customer_timeline", "ix_order_items_product_ref", "ix_outbox_aggregate_order");
     assertThatThrownBy(() -> jdbc.update("insert into orders(internal_id) values (1)"));
+    assertThatThrownBy(() -> jdbc.update("update orders set customer_ref=''"));
+  }
+
+  @Test void hibernateMappingsValidateAgainstFlywaySchema() {
+    assertThatCode(() -> PersistenceMappings.validate(dataSource)).doesNotThrowAnyException();
   }
 
   @Test void roundTripsImmutableSnapshotsAndPagesNewestFirst() {
@@ -67,6 +73,29 @@ class PostgresPersistenceTest {
     first.confirm(Instant.parse("2026-10-22T00:01:00Z")); orders.save(first);
     stale.cancel("changed mind", Instant.parse("2026-10-22T00:02:00Z"));
     assertThatThrownBy(() -> orders.save(stale)).isInstanceOf(OptimisticOrderLockException.class);
+  }
+
+  @Test void persistedSnapshotsCannotBeChangedByAggregateMutationOrDirectSql() {
+    Order original = sample(35, "abababab-abab-abab-abab-abababababab", Instant.parse("2026-10-22T00:00:00Z"));
+    orders.save(original);
+    Map<String, Object> orderSnapshot = jdbc.queryForMap("""
+        select customer_ref,customer_name_snapshot,recipient,address_line1,address_line2,city,region,postal_code,country_code,phone
+        from orders where internal_id=35""");
+    Map<String, Object> itemSnapshot = jdbc.queryForMap("""
+        select product_ref,product_internal_id,sku,product_name_snapshot,unit_amount_snapshot,currency,quantity,line_total
+        from order_items where order_internal_id=35""");
+
+    original.confirm(Instant.parse("2026-10-22T00:01:00Z"));
+    orders.save(original);
+
+    assertThat(jdbc.queryForMap("""
+        select customer_ref,customer_name_snapshot,recipient,address_line1,address_line2,city,region,postal_code,country_code,phone
+        from orders where internal_id=35""")).isEqualTo(orderSnapshot);
+    assertThat(jdbc.queryForMap("""
+        select product_ref,product_internal_id,sku,product_name_snapshot,unit_amount_snapshot,currency,quantity,line_total
+        from order_items where order_internal_id=35""")).isEqualTo(itemSnapshot);
+    assertThatThrownBy(() -> jdbc.update("update orders set customer_name_snapshot='Grace' where internal_id=35"));
+    assertThatThrownBy(() -> jdbc.update("update order_items set unit_amount_snapshot=1 where order_internal_id=35"));
   }
 
   @Test void orderMutationAndOutboxInsertRollbackTogether() {
@@ -95,10 +124,58 @@ class PostgresPersistenceTest {
   @Test void idempotencyClaimReplaysSameHashAndRejectsDifferentHash() {
     PostgresIdempotencyRepository idempotency = new PostgresIdempotencyRepository(jdbc);
     Order order = sample(50, "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee", Instant.parse("2026-10-22T00:00:00Z")); orders.save(order);
-    assertThat(idempotency.claim("customer-1", "key-1", "a".repeat(64), order.internalId(), order.createdAt())).isEqualTo(IdempotencyClaim.CREATED);
-    assertThat(idempotency.claim("customer-1", "key-1", "a".repeat(64), order.internalId(), order.createdAt())).isEqualTo(IdempotencyClaim.REPLAY);
-    assertThatThrownBy(() -> idempotency.claim("customer-1", "key-1", "b".repeat(64), order.internalId(), order.createdAt()))
+    assertThat(idempotency.claim("customer-1", "key-1", "a".repeat(64), order.internalId(), order.id(), order.createdAt()))
+        .isEqualTo(IdempotencyClaim.created(order.id()));
+    assertThat(idempotency.claim("customer-1", "key-1", "a".repeat(64), order.internalId(), order.id(), order.createdAt()))
+        .isEqualTo(IdempotencyClaim.replay(order.id()));
+    assertThatThrownBy(() -> idempotency.claim("customer-1", "key-1", "b".repeat(64), order.internalId(), order.id(), order.createdAt()))
         .isInstanceOf(IdempotencyConflictException.class);
+  }
+
+  @Test void replayAndConflictRemainUsableInsideTransaction() {
+    PostgresIdempotencyRepository idempotency = new PostgresIdempotencyRepository(jdbc);
+    Order original = sample(60, "60606060-6060-6060-6060-606060606060", Instant.parse("2026-10-22T00:00:00Z"));
+    Order candidate = sample(70, "70707070-7070-7070-7070-707070707070", Instant.parse("2026-10-22T00:00:01Z"));
+    orders.save(original); orders.save(candidate);
+    TransactionRunner tx = new SpringTransactionRunner(new DataSourceTransactionManager(dataSource));
+    tx.execute(() -> idempotency.claim("customer-1", "key-tx", "c".repeat(64), original.internalId(), original.id(), original.createdAt()));
+
+    IdempotencyClaim replay = tx.execute(() -> {
+      IdempotencyClaim result = idempotency.claim("customer-1", "key-tx", "c".repeat(64), candidate.internalId(), candidate.id(), candidate.createdAt());
+      assertThat(jdbc.queryForObject("select 1", Integer.class)).isOne();
+      return result;
+    });
+    assertThat(replay).isEqualTo(IdempotencyClaim.replay(original.id()));
+    assertThatThrownBy(() -> tx.execute(() -> idempotency.claim(
+        "customer-1", "key-tx", "d".repeat(64), candidate.internalId(), candidate.id(), candidate.createdAt())))
+        .isInstanceOf(IdempotencyConflictException.class);
+  }
+
+  @Test void concurrentClaimsReturnOneOriginalOrderIdentifier() throws Exception {
+    Order first = sample(80, "80808080-8080-8080-8080-808080808080", Instant.parse("2026-10-22T00:00:00Z"));
+    Order second = sample(90, "90909090-9090-9090-9090-909090909090", Instant.parse("2026-10-22T00:00:01Z"));
+    orders.save(first); orders.save(second);
+    CyclicBarrier barrier = new CyclicBarrier(2);
+    ExecutorService pool = Executors.newFixedThreadPool(2);
+    try {
+      Future<IdempotencyClaim> left = pool.submit(() -> concurrentClaim(first, barrier));
+      Future<IdempotencyClaim> right = pool.submit(() -> concurrentClaim(second, barrier));
+      List<IdempotencyClaim> claims = List.of(left.get(10, TimeUnit.SECONDS), right.get(10, TimeUnit.SECONDS));
+      assertThat(claims).extracting(IdempotencyClaim::disposition)
+          .containsExactlyInAnyOrder(IdempotencyClaim.Disposition.CREATED, IdempotencyClaim.Disposition.REPLAY);
+      assertThat(claims).extracting(IdempotencyClaim::orderId).containsOnly(claims.get(0).orderId());
+    } finally {
+      pool.shutdownNow();
+    }
+  }
+
+  private IdempotencyClaim concurrentClaim(Order candidate, CyclicBarrier barrier) throws Exception {
+    JdbcTemplate threadJdbc = new JdbcTemplate(dataSource);
+    PostgresIdempotencyRepository repository = new PostgresIdempotencyRepository(threadJdbc);
+    TransactionRunner tx = new SpringTransactionRunner(new DataSourceTransactionManager(dataSource));
+    barrier.await(5, TimeUnit.SECONDS);
+    return tx.execute(() -> repository.claim("customer-1", "key-race", "e".repeat(64),
+        candidate.internalId(), candidate.id(), candidate.createdAt()));
   }
 
   private static Order sample(long internalId, String publicId, Instant at) {
