@@ -97,7 +97,40 @@ class OrderApiTest {
     mvc.perform(get("/v3/api-docs")).andExpect(status().isOk())
         .andExpect(jsonPath("$.paths['/api/v1/customers/{customerId}/orders']").exists())
         .andExpect(jsonPath("$.paths['/api/v1/customers/{customerId}/orders/{orderId}/confirmation']").exists())
-        .andExpect(jsonPath("$.info.description").value(org.hamcrest.Matchers.containsString("development and controlled UAT")));
+        .andExpect(jsonPath("$.info.description").value(org.hamcrest.Matchers.containsString("development and controlled UAT")))
+        .andExpect(jsonPath("$.paths['/api/v1/customers/{customerId}/orders'].post.responses['201'].headers.Location").exists())
+        .andExpect(jsonPath("$.paths['/api/v1/customers/{customerId}/orders'].post.responses['400'].content['application/problem+json'].schema['$ref']").value(org.hamcrest.Matchers.endsWith("/ProblemDetail")))
+        .andExpect(jsonPath("$.components.schemas.CancelRequest.required[0]").value("reason"));
+  }
+
+  @Test void malformedHeadersAndFrameworkErrorsUseProblemDetails() throws Exception {
+    String id = create("header-errors", validOrder("SKU-1"));
+    mvc.perform(post("/api/v1/customers/customer-1/orders/{id}/confirmation", id).header("If-Match", "abc"))
+        .andExpect(status().isBadRequest()).andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+        .andExpect(jsonPath("$.code").value("MALFORMED_REQUEST"));
+    mvc.perform(put("/api/v1/customers/customer-1/orders/{id}", id))
+        .andExpect(status().isMethodNotAllowed()).andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+        .andExpect(jsonPath("$.code").value("METHOD_NOT_ALLOWED"));
+    mvc.perform(post("/api/v1/customers/customer-1/orders").header("Idempotency-Key", "media").contentType(MediaType.TEXT_PLAIN).content("x"))
+        .andExpect(status().isUnsupportedMediaType()).andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+        .andExpect(jsonPath("$.code").value("UNSUPPORTED_MEDIA_TYPE"));
+  }
+
+  @Test void equivalentMoneyScalesReplayAndValidationIncludesViolationsAndStableType() throws Exception {
+    String id = create("money-scale", validOrder("SKU-1"));
+    mvc.perform(post("/api/v1/customers/customer-1/orders").header("Idempotency-Key", "money-scale")
+        .contentType(MediaType.APPLICATION_JSON).content(validOrder("SKU-1").replace("99.90", "99.9")))
+        .andExpect(status().isOk()).andExpect(jsonPath("$.id").value(id));
+    mvc.perform(post("/api/v1/customers/customer-1/orders").header("Idempotency-Key", "invalid")
+        .contentType(MediaType.APPLICATION_JSON).content(validOrder("")))
+        .andExpect(status().isUnprocessableEntity()).andExpect(jsonPath("$.violations[0].message").isNotEmpty())
+        .andExpect(jsonPath("$.type").value(org.hamcrest.Matchers.startsWith("https://github.com/exedeehuashan/online-shop/")));
+  }
+
+  private String create(String key, String body) throws Exception {
+    String response=mvc.perform(post("/api/v1/customers/customer-1/orders").header("Idempotency-Key",key)
+        .contentType(MediaType.APPLICATION_JSON).content(body)).andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
+    return json.readTree(response).get("id").asText();
   }
 
   private static String validOrder(String sku) {
