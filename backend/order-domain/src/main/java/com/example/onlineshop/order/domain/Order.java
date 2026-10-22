@@ -48,6 +48,20 @@ public final class Order {
     return new Order(internalId, id, customerReference, null, customerNameSnapshot, items, address, now);
   }
 
+  public static Order reconstitute(OrderInternalId internalId, OrderId id, CustomerReference customerReference,
+                                   Long customerInternalId, String customerNameSnapshot, List<OrderItem> items,
+                                   AddressSnapshot address, OrderStatus status, String cancellationReason,
+                                   Instant createdAt, Instant updatedAt, long version) {
+    Order order = new Order(internalId, id, customerReference, customerInternalId, customerNameSnapshot, items, address, createdAt);
+    order.status = Objects.requireNonNull(status);
+    order.cancellationReason = cancellationReason;
+    order.updatedAt = Objects.requireNonNull(updatedAt);
+    if (version < 0) throw Validation.invalid("version must be non-negative");
+    order.version = version;
+    order.domainEvents.clear();
+    return order;
+  }
+
   public void confirm(Instant now) {
     Objects.requireNonNull(now);
     if (status == OrderStatus.CONFIRMED) return;

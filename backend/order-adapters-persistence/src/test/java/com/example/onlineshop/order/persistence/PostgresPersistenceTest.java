@@ -9,7 +9,9 @@ import java.time.*;
 import java.util.*;
 import javax.sql.DataSource;
 import org.flywaydb.core.Flyway;
-import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.postgresql.ds.PGSimpleDataSource;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DataSourceTransactionManager;
@@ -17,7 +19,7 @@ import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
-@Testcontainers
+@Testcontainers(disabledWithoutDocker = true)
 class PostgresPersistenceTest {
   @Container static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:16-alpine");
   static DataSource dataSource;
@@ -36,7 +38,7 @@ class PostgresPersistenceTest {
     jdbc = new JdbcTemplate(dataSource);
     jdbc.update("truncate outbox_events, order_idempotency, order_items, orders");
     orders = new PostgresOrderRepository(jdbc);
-    outbox = new PostgresOutboxRepository(jdbc, () -> UUID.randomUUID());
+    outbox = new PostgresOutboxRepository(jdbc, new java.util.concurrent.atomic.AtomicLong(1000)::incrementAndGet, UUID::randomUUID);
   }
 
   @Test void migratesApprovedSchemaWithConstraintsAndIndexes() {
@@ -77,6 +79,17 @@ class PostgresPersistenceTest {
     })).isInstanceOf(IllegalStateException.class);
     assertThat(orders.findByIdAndCustomer(order.id(), order.customerReference()).orElseThrow().status()).isEqualTo(OrderStatus.DRAFT);
     assertThat(jdbc.queryForObject("select count(*) from outbox_events", Integer.class)).isZero();
+  }
+
+  @Test void orderMutationAndOutboxInsertCommitTogether() {
+    Order order = sample(45, "ffffffff-ffff-ffff-ffff-ffffffffffff", Instant.parse("2026-10-22T00:00:00Z"));
+    orders.save(order); order.clearDomainEvents();
+    TransactionRunner tx = new SpringTransactionRunner(new DataSourceTransactionManager(dataSource));
+    tx.execute(() -> {
+      order.confirm(Instant.parse("2026-10-22T00:01:00Z")); orders.save(order); outbox.appendAll(order.domainEvents()); return order;
+    });
+    assertThat(orders.findByIdAndCustomer(order.id(), order.customerReference()).orElseThrow().status()).isEqualTo(OrderStatus.CONFIRMED);
+    assertThat(jdbc.queryForObject("select count(*) from outbox_events", Integer.class)).isOne();
   }
 
   @Test void idempotencyClaimReplaysSameHashAndRejectsDifferentHash() {
