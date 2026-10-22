@@ -1,0 +1,9 @@
+import http from 'k6/http'; import {check} from 'k6';
+export const options={scenarios:{normal_mix:{executor:'constant-vus',vus:2,duration:'15s',exec:'normal'},replay:{executor:'constant-vus',vus:1,duration:'10s',exec:'replay',startTime:'15s'},hot_access:{executor:'constant-vus',vus:2,duration:'10s',exec:'hot',startTime:'25s'},optimistic_conflict:{executor:'constant-vus',vus:1,duration:'10s',exec:'conflict',startTime:'35s'}}};
+const ORDER=__ENV.ORDER_API||'http://127.0.0.1:8081'; const CATALOG=__ENV.CATALOG_API||'http://127.0.0.1:8082';
+const payload=JSON.stringify({customerName:'Perf Synthetic',items:[{productId:'product-perf',sku:'SKU-PERF',name:'Fixture',unitPrice:{amount:10,currency:'NZD'},quantity:1}],shippingAddress:{recipient:'Perf Synthetic',line1:'1 Test Street',line2:'',city:'Auckland',region:'Auckland',postalCode:'1010',countryCode:'NZ',phone:''}});
+const headers={'Content-Type':'application/json','Idempotency-Key':'perf-stable-key'};
+export function normal(){check(http.get(`${CATALOG}/api/v1/products?page=0&size=20`),{'catalog 200':r=>r.status===200});check(http.get(`${ORDER}/api/v1/customers/perf/orders?page=0&size=20`),{'orders 200':r=>r.status===200});}
+export function replay(){const r=http.post(`${ORDER}/api/v1/customers/perf/orders`,payload,{headers});check(r,{'created/replayed':x=>x.status===201||x.status===200});}
+export function hot(){http.get(`${ORDER}/api/v1/customers/perf/orders?page=0&size=100`);http.get(`${CATALOG}/api/v1/products?page=0&size=100`);}
+export function conflict(){const made=http.post(`${ORDER}/api/v1/customers/conflict-${__VU}/orders`,payload,{headers:{...headers,'Idempotency-Key':`conflict-${__VU}`}});if(made.status===201){const id=made.json('id');http.post(`${ORDER}/api/v1/customers/conflict-${__VU}/orders/${id}/confirmation`,null,{headers:{'If-Match':'"99"'}});}}

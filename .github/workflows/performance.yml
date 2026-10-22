@@ -1,0 +1,17 @@
+name: Observational performance
+on:
+  workflow_dispatch:
+  schedule: [{cron: '30 15 * * 1'}]
+permissions: {contents: read}
+jobs:
+  baseline:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: grafana/setup-k6-action@v1
+      - run: make compose-up compose-ready test-performance
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with: {name: performance-baseline, path: tests/performance/reports, retention-days: 14}
+      - if: always()
+        run: docker compose down --remove-orphans
