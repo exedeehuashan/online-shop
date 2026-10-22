@@ -1,12 +1,10 @@
 {
   "taskId": "TASK-0001",
   "title": "E-Shop order module MVP",
-  "state": "DESIGNED",
+  "state": "DEVELOPING",
   "approvalRequired": true,
-  "approvalStatus": "PENDING_APPROVAL",
-  "blockedOn": [
-    "explicit overall approval of PR #18 and Issue #2"
-  ],
+  "approvalStatus": "APPROVED",
+  "blockedOn": [],
   "confirmedDesignDecisions": [
     "temporary client-supplied price snapshots for controlled dev/UAT",
     "opaque public references plus time-ordered bigint internal IDs and dual indexes",
@@ -23,11 +21,13 @@
     "test-plan.md",
     "test-result.md"
   ],
-  "implementationStarted": false,
+  "implementationStarted": true,
   "testsExecuted": false,
-  "designOnly": true,
+  "designOnly": false,
   "humanSupervisionRequired": true,
-  "implementationAuthorized": false,
+  "implementationAuthorized": true,
+  "approvedPullRequest": 18,
+  "approvalDate": "2026-10-22",
   "lastReviewedAgainstIssues": "1-17",
   "lastDesignDecisionDate": "2026-10-22"
 }
