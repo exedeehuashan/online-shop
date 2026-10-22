@@ -12,6 +12,15 @@ This file is the source used to update GitHub issues. / 本文件是更新 GitHu
 ### Purpose / 目标
 Review and approve TASK-0001 API, database, modular-monolith/hexagonal boundaries, event contracts, security constraints, and deferred scope. / 审查并批准 TASK-0001 的 API、数据库、模块化单体/六边形边界、事件契约、安全约束与延后范围。
 
+### Confirmed choices / 已确认选择
+1. Temporary client price snapshots for controlled dev/UAT. / 受控开发/UAT 临时使用客户端价格快照。
+2. UUID/opaque public references plus 63-bit time-ordered internal IDs and dual indexes. / UUID/opaque 对外引用加 63-bit 时间有序内部 ID 与双索引。
+3. Idempotent replay `200`; first create `201`. / 幂等重放 `200`；首次创建 `201`。
+4. Semantic validation `422`; parse failure `400`. / 语义校验 `422`；解析失败 `400`。
+5. Cart UI merges duplicate SKU; Order API rejects it. / 购物车 UI 合并重复 SKU；订单 API 拒绝重复 SKU。
+6. Transactional Outbox only; Kafka publisher deferred. / 仅 Transactional Outbox；Kafka publisher 延后。
+7. Immutable customer/address/product-name/unit-price snapshots. / 客户/地址/商品名称/单价快照不可变。
+
 ### Acceptance Criteria / 验收标准
 - [x] Human approver records the seven design choices in `design.md`. / 人类批准者已记录 `design.md` 中七项设计选择。
 - [ ] Human approver explicitly approves PR #18 as the implementation baseline. / 人类批准者明确批准 PR #18 作为实施基线。
