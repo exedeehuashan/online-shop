@@ -129,7 +129,7 @@ R1 回归补充：边界检测通过集中 code-point predicate 覆盖完整 Uni
 
 ## Issue #5 developer verification / Issue #5 开发者验证
 
-- 日期 / Date：2026-10-22
+- 日期 / Date：2026-10-23
 - 优先级 / Priority：P0；顺序 / Sequence：3；依赖 / Dependencies：#2、#4；状态 / Status：`IN_REVIEW / QA_REMEDIATED`。
 - 命令 / Command：`DOCKER_HOST=unix:///home/hsl/.docker/desktop/docker.sock TESTCONTAINERS_RYUK_DISABLED=true mvn -B clean verify -Dapi.version=1.56`
 - 构建结果 / Build result：**BUILD SUCCESS**。
@@ -139,10 +139,10 @@ R1 回归补充：边界检测通过集中 code-point predicate 覆盖完整 Uni
 
 ## Issue #5 QA remediation verification / Issue #5 QA 修复验证
 
-- 日期 / Date：2026-10-22；状态流转 / Transition：`FAILED → DEVELOPING → IN_REVIEW_ENVIRONMENT_BLOCKED`。
+- 日期 / Date：2026-10-23；状态流转 / Transition：`FAILED → DEVELOPING → IN_REVIEW_QA_REMEDIATED`。
 - 红灯证据 / Red evidence：`3f55c29`；测试编译按预期因缺少新幂等结果契约与 ORM validator 失败。/ Test compilation failed as expected because the new idempotency result contract and ORM validator did not yet exist.
 - 修复 / Fixes：幂等插入使用 non-erroring conflict strategy，并返回首次订单 public UUID；显式 Hibernate mappings 执行 Flyway schema validation；数据库约束及触发器强化快照不可变性；增加事务内及并发竞争回归。/ Idempotency uses a non-erroring conflict strategy and returns the first order's public UUID; explicit Hibernate mappings validate the Flyway schema; constraints and triggers enforce snapshot immutability; transaction and concurrent-race regressions were added.
-- 定向命令 / Targeted command：`mvn -B -pl backend/order-adapters-persistence -am test -DskipTests=false -Dtest=PostgresPersistenceTest -Dsurefire.failIfNoSpecifiedTests=false` → **BUILD SUCCESS**, 10 total, 10 skipped, 0 failures/errors（Docker unavailable）。
+- 定向命令 / Targeted command：`DOCKER_HOST=unix:///home/hsl/.docker/desktop/docker.sock TESTCONTAINERS_RYUK_DISABLED=true mvn -B -pl backend/order-adapters-persistence -am test -Dtest=PostgresPersistenceTest -Dsurefire.failIfNoSpecifiedTests=false -Dsurefire.failIfNoTests=true -Dapi.version=1.56` → **BUILD SUCCESS**, 10 total, 10 passed, 0 skipped/failures/errors（PostgreSQL 16.15）。
 - 完整命令 / Full command：`DOCKER_HOST=unix:///home/hsl/.docker/desktop/docker.sock TESTCONTAINERS_RYUK_DISABLED=true mvn -B clean verify -Dapi.version=1.56` → **45/45 passed, 0 skipped**。
 
 ### Independent QA remediation / 独立 QA 修复

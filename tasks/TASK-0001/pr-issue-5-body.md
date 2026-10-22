@@ -26,8 +26,9 @@ Implements PostgreSQL persistence for the Order bounded context with Flyway-owne
 - Red-test commit / 红灯测试提交: `d33983d`
 - Implementation commit / 实现提交: `93b7883`
 - QA red-test commit / QA 红灯测试提交: `3f55c29`
-- Command / 命令: `mvn -B clean verify`
+- Command / 命令: `DOCKER_HOST=unix:///home/hsl/.docker/desktop/docker.sock TESTCONTAINERS_RYUK_DISABLED=true mvn -B clean verify -Dapi.version=1.56`
 - Result / 结果: **BUILD SUCCESS** — 45 total, 45 passed, 0 skipped, 0 failures, 0 errors. / 共 45 项，45 通过，0 跳过，0 失败，0 错误。
+- Verified / 验证日期: 2026-10-23 against PostgreSQL 16.15 on Docker Engine 29.8.2. / 在 Docker Engine 29.8.2 的 PostgreSQL 16.15 上验证。
 - The ten Testcontainers PostgreSQL tests additionally cover executable ORM validation, database-enforced snapshot immutability, in-transaction idempotent replay/conflict, and concurrent claims. / 10 项 Testcontainers PostgreSQL 测试新增覆盖可执行 ORM 校验、数据库强制快照不可变、事务内幂等重放/冲突及并发 claim。
 
 ## PostgreSQL gate / PostgreSQL 门禁

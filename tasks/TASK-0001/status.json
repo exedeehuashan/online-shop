@@ -31,17 +31,18 @@
   "lastReviewedAgainstIssues": "1-17",
   "lastDesignDecisionDate": "2026-10-22",
   "currentIssue": 5,
-  "currentIssueStatus": "IN_REVIEW_ENVIRONMENT_BLOCKED",
+  "currentIssueStatus": "IN_REVIEW_QA_REMEDIATED",
   "currentPullRequest": 20,
   "completedIssues": [4],
   "mergedPullRequests": [18, 19],
   "developerVerification": {
-    "command": "mvn -B clean verify",
+    "command": "DOCKER_HOST=unix:///home/hsl/.docker/desktop/docker.sock TESTCONTAINERS_RYUK_DISABLED=true mvn -B clean verify -Dapi.version=1.56",
     "result": "PASS",
     "tests": 45,
-    "passed": 35,
-    "skipped": 10,
-    "integrationBlocker": "Docker daemon unavailable; ten PostgreSQL Testcontainers tests, including ORM schema validation and concurrency, not executed",
-    "date": "2026-10-22"
+    "passed": 45,
+    "skipped": 0,
+    "integrationBlocker": null,
+    "postgresqlIntegration": "PASS: 10/10 Testcontainers tests executed against PostgreSQL 16.15",
+    "date": "2026-10-23"
   }
 }
