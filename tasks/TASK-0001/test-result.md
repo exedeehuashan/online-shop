@@ -123,6 +123,6 @@
 | D2 | null item/null unit price 抛 `DomainValidationException(INVALID_VALUE)`，不再泄漏 NPE。/ Null item/unit price raises the domain validation error rather than leaking NPE. | Fixed |
 | D3 | opaque reference 对空白和首尾空格显式拒绝，合法值原样保留。/ Blank or surrounding whitespace is explicitly rejected and valid opaque values are preserved. | Fixed |
 
-R1 回归补充：边界检测覆盖 Unicode whitespace（包括 U+2003 EM SPACE 与 U+00A0 NBSP），不使用 trim 或规范化；合法 opaque ID 的值与对象语义保持精确不变。/ R1 regression coverage: boundary validation handles Unicode whitespace (including U+2003 EM SPACE and U+00A0 NBSP) without trimming or normalisation; valid opaque IDs retain their exact value and identity semantics.
+R1 回归补充：边界检测通过集中 code-point predicate 覆盖完整 Unicode `White_Space` 集合（包括 U+0085 NEL、U+2003 EM SPACE 与 U+00A0 NBSP），不使用 trim 或规范化；`CustomerReference` 与 `ProductReference` 均覆盖 U+0085 首尾边界，内部 U+0085 保持精确不变。/ R1 regression coverage: a central code-point predicate handles the complete Unicode `White_Space` set (including U+0085 NEL, U+2003 EM SPACE, and U+00A0 NBSP) without trimming or normalisation; both reference types cover U+0085 at either boundary and preserve an internal U+0085 exactly.
 
 修复严格限于 Issue #4；未触碰 Issues #5–#11，PR #19 未合并。/ Remediation is strictly scoped to Issue #4; Issues #5–#11 are untouched and PR #19 remains unmerged.

@@ -36,7 +36,7 @@
   "developerVerification": {
     "command": "mvn -B clean verify",
     "result": "PASS",
-    "tests": 33,
+    "tests": 35,
     "date": "2026-10-22"
   }
 }
