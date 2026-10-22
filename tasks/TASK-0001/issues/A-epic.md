@@ -12,9 +12,21 @@
 
 ## Design baseline
 
-- [Requirement](../requirement.md)
-- [Design](../design.md)
-- [Test plan](../test-plan.md)
+- [Requirement](https://github.com/exedeehuashan/online-shop/blob/main/tasks/TASK-0001/requirement.md)
+- [Design](https://github.com/exedeehuashan/online-shop/blob/main/tasks/TASK-0001/design.md)
+- [Test plan](https://github.com/exedeehuashan/online-shop/blob/main/tasks/TASK-0001/test-plan.md)
+
+## Backlog
+
+- [ ] #2 Design approval
+- [ ] #4 Domain and application layer
+- [ ] #5 PostgreSQL and Flyway
+- [ ] #6 REST API
+- [ ] #7 Kafka transactional outbox
+- [ ] #8 React workflows
+- [ ] #9 Integration, contract and Playwright suites
+- [ ] #10 UAT and performance assets
+- [ ] #11 Docker Compose and CI quality gates
 
 ## Completion criteria
 

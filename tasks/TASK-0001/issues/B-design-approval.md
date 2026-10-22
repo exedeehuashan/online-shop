@@ -11,8 +11,8 @@
 
 ## Review documents
 
-- [Requirement](../requirement.md)
-- [Design](../design.md)
-- [Test plan](../test-plan.md)
+- [Requirement](https://github.com/exedeehuashan/online-shop/blob/main/tasks/TASK-0001/requirement.md)
+- [Design](https://github.com/exedeehuashan/online-shop/blob/main/tasks/TASK-0001/design.md)
+- [Test plan](https://github.com/exedeehuashan/online-shop/blob/main/tasks/TASK-0001/test-plan.md)
 
 批准或提出修改意见后，再将任务从 `DESIGNED` 转为 `APPROVED`。
