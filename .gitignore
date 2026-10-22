@@ -2,3 +2,8 @@ target/
 .idea/
 *.iml
 compose.yaml
+frontend/order-web/node_modules/
+frontend/order-web/dist/
+frontend/order-web/playwright-report/
+frontend/order-web/test-results/
+frontend/order-web/*.tsbuildinfo
