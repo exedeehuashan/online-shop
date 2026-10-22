@@ -11,97 +11,13 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    customerId: components["parameters"]["customerId"];
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["PageResponse"];
-                    };
-                };
-            };
-        };
+        get: operations["list"];
         put?: never;
-        post: {
-            parameters: {
-                query?: never;
-                header: {
-                    "Idempotency-Key": string;
-                };
-                path: {
-                    customerId: components["parameters"]["customerId"];
-                };
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": components["schemas"]["CreateRequest"];
-                };
-            };
-            responses: {
-                /** @description Created */
-                201: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["OrderResponse"];
-                    };
-                };
-                422: components["responses"]["Problem"];
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/customers/{customerId}/orders/{orderId}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    customerId: components["parameters"]["customerId"];
-                    orderId: components["parameters"]["orderId"];
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["OrderResponse"];
-                    };
-                };
-                404: components["responses"]["Problem"];
-            };
-        };
-        put?: never;
-        post?: never;
+        /**
+         * Create an order
+         * @description Returns 201 for the first request and 200 for an identical idempotent replay.
+         */
+        post: operations["create"];
         delete?: never;
         options?: never;
         head?: never;
@@ -117,32 +33,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: {
-            parameters: {
-                query?: never;
-                header: {
-                    "If-Match": components["parameters"]["ifMatch"];
-                };
-                path: {
-                    customerId: components["parameters"]["customerId"];
-                    orderId: components["parameters"]["orderId"];
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["OrderResponse"];
-                    };
-                };
-                409: components["responses"]["Problem"];
-            };
-        };
+        post: operations["confirm"];
         delete?: never;
         options?: never;
         head?: never;
@@ -158,37 +49,23 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: {
-            parameters: {
-                query?: never;
-                header: {
-                    "If-Match": components["parameters"]["ifMatch"];
-                };
-                path: {
-                    customerId: components["parameters"]["customerId"];
-                    orderId: components["parameters"]["orderId"];
-                };
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": components["schemas"]["CancelRequest"];
-                };
-            };
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["OrderResponse"];
-                    };
-                };
-                409: components["responses"]["Problem"];
-                422: components["responses"]["Problem"];
-            };
+        post: operations["cancel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/customers/{customerId}/orders/{orderId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
         };
+        get: operations["detail"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -199,90 +76,388 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
-        Money: {
-            amount: string;
-            currency: string;
-        };
-        Address: {
-            recipient: string;
-            line1: string;
+        AddressRequest: {
+            recipient?: string;
+            line1?: string;
             line2?: string;
-            city: string;
+            city?: string;
             region?: string;
-            postalCode: string;
-            countryCode: string;
+            postalCode?: string;
+            countryCode?: string;
             phone?: string;
         };
-        ItemRequest: {
-            productId: string;
-            sku: string;
-            name: string;
-            unitPrice: components["schemas"]["Money"];
-            quantity: number;
-        };
         CreateRequest: {
-            customerName: string;
-            items: components["schemas"]["ItemRequest"][];
-            shippingAddress: components["schemas"]["Address"];
+            customerName?: string;
+            items?: components["schemas"]["ItemRequest"][];
+            shippingAddress?: components["schemas"]["AddressRequest"];
+        };
+        ItemRequest: {
+            productId?: string;
+            sku?: string;
+            name?: string;
+            unitPrice?: components["schemas"]["MoneyRequest"];
+            /** Format: int32 */
+            quantity?: number;
+        };
+        MoneyRequest: {
+            amount?: number;
+            currency?: string;
+        };
+        ProblemDetail: {
+            /** Format: uri */
+            type?: string;
+            title?: string;
+            /** Format: int32 */
+            status?: number;
+            detail?: string;
+            /** Format: uri */
+            instance?: string;
+            properties?: {
+                [key: string]: Record<string, never>;
+            };
+        };
+        AddressResponse: {
+            recipient?: string;
+            line1?: string;
+            line2?: string;
+            city?: string;
+            region?: string;
+            postalCode?: string;
+            countryCode?: string;
+            phone?: string;
+        };
+        ItemResponse: {
+            productId?: string;
+            sku?: string;
+            name?: string;
+            unitPrice?: components["schemas"]["MoneyResponse"];
+            /** Format: int32 */
+            quantity?: number;
+            lineTotal?: components["schemas"]["MoneyResponse"];
+        };
+        MoneyResponse: {
+            amount?: string;
+            currency?: string;
+        };
+        OrderResponse: {
+            /** Format: uuid */
+            id?: string;
+            customerId?: string;
+            customerName?: string;
+            status?: string;
+            items?: components["schemas"]["ItemResponse"][];
+            total?: components["schemas"]["MoneyResponse"];
+            shippingAddress?: components["schemas"]["AddressResponse"];
+            cancellationReason?: string;
+            /** Format: int64 */
+            version?: number;
+            /** Format: date-time */
+            createdAt?: string;
+            /** Format: date-time */
+            updatedAt?: string;
         };
         CancelRequest: {
             reason: string;
         };
-        OrderItem: components["schemas"]["ItemRequest"] & {
-            lineTotal: components["schemas"]["Money"];
-        };
-        OrderResponse: {
-            /** Format: uuid */
-            id: string;
-            customerId: string;
-            customerName: string;
-            /** @enum {string} */
-            status: "DRAFT" | "CONFIRMED" | "CANCELLED";
-            items: components["schemas"]["OrderItem"][];
-            total: components["schemas"]["Money"];
-            shippingAddress: components["schemas"]["Address"];
-            cancellationReason?: string | null;
-            /** Format: int64 */
-            version: number;
-            /** Format: date-time */
-            createdAt: string;
-            /** Format: date-time */
-            updatedAt: string;
-        };
         PageResponse: {
-            content: components["schemas"]["OrderResponse"][];
-            page: number;
-            size: number;
-        };
-        Problem: {
-            status?: number;
-            code?: string;
-            detail?: string;
-            violations?: {
-                field?: string;
-                message?: string;
-            }[];
+            content?: components["schemas"]["OrderResponse"][];
+            /** Format: int32 */
+            page?: number;
+            /** Format: int32 */
+            size?: number;
         };
     };
-    responses: {
-        /** @description Problem details */
-        Problem: {
-            headers: {
-                [name: string]: unknown;
-            };
-            content: {
-                "application/problem+json": components["schemas"]["Problem"];
-            };
-        };
-    };
-    parameters: {
-        customerId: string;
-        orderId: string;
-        ifMatch: string;
-    };
+    responses: never;
+    parameters: never;
     requestBodies: never;
     headers: never;
     pathItems: never;
 }
 export type $defs = Record<string, never>;
-export type operations = Record<string, never>;
+export interface operations {
+    list: {
+        parameters: {
+            query?: {
+                page?: number;
+                size?: number;
+            };
+            header?: never;
+            path: {
+                customerId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PageResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
+    create: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path: {
+                customerId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["OrderResponse"];
+                };
+            };
+            /** @description Created */
+            201: {
+                headers: {
+                    /** @description URI of the created order */
+                    Location?: unknown;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["OrderResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Unsupported Media Type */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
+    confirm: {
+        parameters: {
+            query?: never;
+            header: {
+                "If-Match": string;
+            };
+            path: {
+                customerId: string;
+                orderId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["OrderResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
+    cancel: {
+        parameters: {
+            query?: never;
+            header: {
+                "If-Match": string;
+            };
+            path: {
+                customerId: string;
+                orderId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CancelRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["OrderResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Unsupported Media Type */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
+    detail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                customerId: string;
+                orderId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["OrderResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
+}

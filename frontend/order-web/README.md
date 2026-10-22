@@ -14,6 +14,6 @@ npx playwright install chromium
 npm run playwright
 ```
 
-Set `VITE_ORDER_API_URL` for a local API origin and `VITE_ORDER_CUSTOMER_ID` for the controlled-UAT customer. Defaults are same-origin and `customer-1`.
+Run the backend on `http://127.0.0.1:8080`, then start Vite without `VITE_ORDER_API_URL`. The checked-in Vite proxy forwards same-origin `/api` requests to the backend, avoiding any backend CORS/security change. If the backend uses another local port, set `ORDER_API_PROXY_TARGET` when starting Vite (for example `ORDER_API_PROXY_TARGET=http://127.0.0.1:18080 npm run dev`). `VITE_ORDER_CUSTOMER_ID` selects the controlled-UAT customer and defaults to `customer-1`.
 
-`openapi/order-api.json` is the deterministic `/v3/api-docs` export provenance-pinned to backend commit `9f14c194dfc0ece7e94f9f09a0f8b629e16a7e2d`. `api:check` regenerates the checked-in client types and fails on drift.
+`openapi/order-api.json` is the byte-for-byte `/v3/api-docs` export from backend commit `9f14c194dfc0ece7e94f9f09a0f8b629e16a7e2d` (SHA-256 recorded in `openapi/PROVENANCE.md`). Generated operation/schema types are consumed by the API adapter. `api:check` verifies the pinned export checksum and regenerates the checked-in types, so backend-contract input drift or generated-output drift fails the gate.

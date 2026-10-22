@@ -1,0 +1,19 @@
+import {QueryClient,QueryClientProvider} from '@tanstack/react-query';
+import {render,screen,waitFor,within} from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import {describe,expect,it,vi} from 'vitest';
+import {buildOrder} from '../features/orders/fixtures/orders';
+import {orderKeys} from '../features/orders/api/queries';
+import {OrderDetail} from '../routes/OrderDetail';
+
+vi.mock('@tanstack/react-router',async importOriginal=>({...await importOriginal<typeof import('@tanstack/react-router')>(),useParams:()=>({orderId:'11111111-1111-1111-1111-111111111111'})}));
+const json=(body:unknown,status=200)=>new Response(JSON.stringify(body),{status,headers:{'Content-Type':status>=400?'application/problem+json':'application/json'}});
+const renderDetail=(fetcher:typeof fetch=vi.fn(async(_input,init)=>init?.method==='POST'?json(buildOrder({status:'CANCELLED',version:1,cancellationReason:'changed mind'})):json(buildOrder())))=>{vi.stubGlobal('fetch',fetcher);const client=new QueryClient({defaultOptions:{queries:{retry:false}}});return {client,...render(<QueryClientProvider client={client}><OrderDetail/></QueryClientProvider>)};};
+
+describe('order detail and mutations',()=>{
+  it('shows loading then a complete detail snapshot',async()=>{renderDetail();expect(screen.getByRole('status',{name:'Loading order detail'})).toBeInTheDocument();expect(await screen.findByText('Ada Lovelace')).toBeInTheDocument();expect(screen.getByText('SKU-1')).toBeInTheDocument();expect(screen.getByText(/1 Queen Street/)).toBeInTheDocument();});
+  it('renders a retryable not-found state',async()=>{renderDetail(vi.fn(async()=>json({status:404,detail:'missing'},404)));expect(await screen.findByRole('heading',{name:'Order not found'})).toBeInTheDocument();expect(screen.getByRole('button',{name:'Retry'})).toBeEnabled();});
+  it('keeps cancellation failure and retry inside the accessible dialog',async()=>{renderDetail(vi.fn(async(_input,init)=>init?.method==='POST'?json({status:502,detail:'gateway down'},502):json(buildOrder())));await screen.findByText('Ada Lovelace');await userEvent.click(screen.getByRole('button',{name:'Cancel order'}));const dialog=screen.getByRole('dialog');await userEvent.type(within(dialog).getByLabelText('Reason'),'changed mind');await userEvent.click(within(dialog).getByRole('button',{name:'Confirm cancellation'}));expect(await within(dialog).findByRole('alert')).toHaveTextContent('gateway down');expect(within(dialog).getByRole('button',{name:'Retry cancellation'})).toBeEnabled();expect(within(dialog).getByLabelText('Reason')).toHaveValue('changed mind');});
+  it('updates detail cache, invalidates list, and moves focus after successful cancellation',async()=>{const {client}=renderDetail();await screen.findByText('Ada Lovelace');const invalidate=vi.spyOn(client,'invalidateQueries');await userEvent.click(screen.getByRole('button',{name:'Cancel order'}));await userEvent.type(screen.getByLabelText('Reason'),'changed mind');await userEvent.click(screen.getByRole('button',{name:'Confirm cancellation'}));const status=await screen.findByRole('status');await waitFor(()=>expect(status).toHaveFocus());expect(client.getQueryData(orderKeys.detail(buildOrder().id))).toMatchObject({status:'CANCELLED'});expect(invalidate).toHaveBeenCalledWith({queryKey:orderKeys.list});});
+  it('disables the cancel submit while the mutation is pending',async()=>{renderDetail(vi.fn(async(_input,init)=>{if(init?.method==='POST'){await new Promise(resolve=>setTimeout(resolve,50));return json(buildOrder({status:'CANCELLED'}));}return json(buildOrder());}));await screen.findByText('Ada Lovelace');await userEvent.click(screen.getByRole('button',{name:'Cancel order'}));await userEvent.type(screen.getByLabelText('Reason'),'changed mind');await userEvent.click(screen.getByRole('button',{name:'Confirm cancellation'}));expect(screen.getByRole('button',{name:'Cancelling…'})).toBeDisabled();});
+});
