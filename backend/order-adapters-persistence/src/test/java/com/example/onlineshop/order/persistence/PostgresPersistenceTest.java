@@ -16,13 +16,13 @@ import org.junit.jupiter.api.Test;
 import org.postgresql.ds.PGSimpleDataSource;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DataSourceTransactionManager;
-import org.testcontainers.containers.PostgreSQLContainer;
+import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
-@Testcontainers(disabledWithoutDocker = true)
+@Testcontainers
 class PostgresPersistenceTest {
-  @Container static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:16-alpine");
+  @Container static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer("postgres:16-alpine");
   static DataSource dataSource;
   JdbcTemplate jdbc;
   PostgresOrderRepository orders;
@@ -51,11 +51,20 @@ class PostgresPersistenceTest {
     orders.save(order);
     assertThatThrownBy(() -> jdbc.update("""
         insert into order_items(internal_id,order_internal_id,product_ref,sku,product_name_snapshot,
+          unit_amount_snapshot,currency,quantity,line_total) values (8,5,'product-3','SKU-3','Cable',10,'NZD',2,20)"""));
+    assertThatThrownBy(() -> jdbc.update("""
+        insert into order_items(internal_id,order_internal_id,product_ref,sku,product_name_snapshot,
           unit_amount_snapshot,currency,quantity,line_total) values (7,5,'product-2','SKU-2','Case',10,'NZD',2,19)"""));
     assertThatThrownBy(() -> jdbc.update("""
         insert into order_idempotency(customer_ref,idempotency_key,request_hash,order_internal_id,order_public_id,created_at)
         values ('customer-1','invalid-hash',?,5,?,'2026-10-22T00:00:00Z')""",
         "A".repeat(64), order.id().value()));
+    Order another = sample(15, "15151515-1515-1515-1515-151515151515", Instant.parse("2026-10-22T00:00:01Z"));
+    orders.save(another);
+    assertThatThrownBy(() -> jdbc.update("""
+        insert into order_idempotency(customer_ref,idempotency_key,request_hash,order_internal_id,order_public_id,created_at)
+        values ('customer-1','mismatched-order',?,5,?,?)""",
+        "a".repeat(64), another.id().value(), OffsetDateTime.ofInstant(another.createdAt(), ZoneOffset.UTC)));
   }
 
   @Test void hibernateMappingsValidateAgainstFlywaySchema() {
@@ -81,6 +90,15 @@ class PostgresPersistenceTest {
     first.confirm(Instant.parse("2026-10-22T00:01:00Z")); orders.save(first);
     stale.cancel("changed mind", Instant.parse("2026-10-22T00:02:00Z"));
     assertThatThrownBy(() -> orders.save(stale)).isInstanceOf(OptimisticOrderLockException.class);
+
+    Order multiMutation = sample(31, "31313131-3131-3131-3131-313131313131", Instant.parse("2026-10-22T00:00:00Z"));
+    orders.save(multiMutation);
+    Order loaded = orders.findByIdAndCustomer(multiMutation.id(), multiMutation.customerReference()).orElseThrow();
+    loaded.confirm(Instant.parse("2026-10-22T00:01:00Z"));
+    loaded.cancel("changed mind", Instant.parse("2026-10-22T00:02:00Z"));
+    assertThatCode(() -> orders.save(loaded)).doesNotThrowAnyException();
+    Order unchanged = orders.findByIdAndCustomer(multiMutation.id(), multiMutation.customerReference()).orElseThrow();
+    assertThatCode(() -> orders.save(unchanged)).doesNotThrowAnyException();
   }
 
   @Test void persistedSnapshotsCannotBeChangedByAggregateMutationOrDirectSql() {
