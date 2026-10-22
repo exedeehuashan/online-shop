@@ -1,7 +1,7 @@
 {
   "taskId": "TASK-0001",
   "title": "E-Shop order module MVP",
-  "state": "DEVELOPING",
+  "state": "IN_REVIEW",
   "approvalRequired": true,
   "approvalStatus": "APPROVED",
   "blockedOn": [],
@@ -31,14 +31,18 @@
   "lastReviewedAgainstIssues": "1-17",
   "lastDesignDecisionDate": "2026-10-22",
   "currentIssue": 5,
-  "currentIssueStatus": "DEVELOPING",
-  "currentPullRequest": null,
+  "currentIssueStatus": "IN_REVIEW_QA_REMEDIATED",
+  "currentPullRequest": 20,
   "completedIssues": [4],
   "mergedPullRequests": [18, 19],
   "developerVerification": {
-    "command": "mvn -B clean verify",
+    "command": "DOCKER_HOST=unix:///home/hsl/.docker/desktop/docker.sock TESTCONTAINERS_RYUK_DISABLED=true mvn -B clean verify -Dapi.version=1.56",
     "result": "PASS",
-    "tests": 35,
-    "date": "2026-10-22"
+    "tests": 45,
+    "passed": 45,
+    "skipped": 0,
+    "integrationBlocker": null,
+    "postgresqlIntegration": "PASS: 10/10 Testcontainers tests executed against PostgreSQL 16.15",
+    "date": "2026-10-23"
   }
 }

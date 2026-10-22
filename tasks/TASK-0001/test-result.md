@@ -126,3 +126,29 @@
 R1 回归补充：边界检测通过集中 code-point predicate 覆盖完整 Unicode `White_Space` 集合（包括 U+0085 NEL、U+2003 EM SPACE 与 U+00A0 NBSP），不使用 trim 或规范化；`CustomerReference` 与 `ProductReference` 均覆盖 U+0085 首尾边界，内部 U+0085 保持精确不变。/ R1 regression coverage: a central code-point predicate handles the complete Unicode `White_Space` set (including U+0085 NEL, U+2003 EM SPACE, and U+00A0 NBSP) without trimming or normalisation; both reference types cover U+0085 at either boundary and preserve an internal U+0085 exactly.
 
 修复严格限于 Issue #4；未触碰 Issues #5–#11，PR #19 未合并。/ Remediation is strictly scoped to Issue #4; Issues #5–#11 are untouched and PR #19 remains unmerged.
+
+## Issue #5 developer verification / Issue #5 开发者验证
+
+- 日期 / Date：2026-10-23
+- 优先级 / Priority：P0；顺序 / Sequence：3；依赖 / Dependencies：#2、#4；状态 / Status：`IN_REVIEW / QA_REMEDIATED`。
+- 命令 / Command：`DOCKER_HOST=unix:///home/hsl/.docker/desktop/docker.sock TESTCONTAINERS_RYUK_DISABLED=true mvn -B clean verify -Dapi.version=1.56`
+- 构建结果 / Build result：**BUILD SUCCESS**。
+- 测试结果 / Test result：45 total；45 passed；0 skipped；0 failures；0 errors。领域 14、应用 21、PostgreSQL Testcontainers 10。/ 45 total; 45 passed; 0 skipped; 0 failures; 0 errors: domain 14, application 21, PostgreSQL Testcontainers 10.
+- PostgreSQL 集成 / PostgreSQL integration：**已执行 / EXECUTED** against `postgres:16-alpine` on Docker Desktop 29 with compatible API `1.56`. Migration、constraints/indexes、snapshot round-trip/immutability、paging、optimistic locking、idempotency 及 Order + Outbox 原子性全部通过。/ All persistence acceptance paths passed against real PostgreSQL.
+- 空白检查 / Whitespace：`git diff --check` → PASS。
+
+## Issue #5 QA remediation verification / Issue #5 QA 修复验证
+
+- 日期 / Date：2026-10-23；状态流转 / Transition：`FAILED → DEVELOPING → IN_REVIEW_QA_REMEDIATED`。
+- 红灯证据 / Red evidence：`3f55c29`；测试编译按预期因缺少新幂等结果契约与 ORM validator 失败。/ Test compilation failed as expected because the new idempotency result contract and ORM validator did not yet exist.
+- 修复 / Fixes：幂等插入使用 non-erroring conflict strategy，并返回首次订单 public UUID；显式 Hibernate mappings 执行 Flyway schema validation；数据库约束及触发器强化快照不可变性；增加事务内及并发竞争回归。/ Idempotency uses a non-erroring conflict strategy and returns the first order's public UUID; explicit Hibernate mappings validate the Flyway schema; constraints and triggers enforce snapshot immutability; transaction and concurrent-race regressions were added.
+- 定向命令 / Targeted command：`DOCKER_HOST=unix:///home/hsl/.docker/desktop/docker.sock TESTCONTAINERS_RYUK_DISABLED=true mvn -B -pl backend/order-adapters-persistence -am test -Dtest=PostgresPersistenceTest -Dsurefire.failIfNoSpecifiedTests=false -Dsurefire.failIfNoTests=true -Dapi.version=1.56` → **BUILD SUCCESS**, 10 total, 10 passed, 0 skipped/failures/errors（PostgreSQL 16.15）。
+- 完整命令 / Full command：`DOCKER_HOST=unix:///home/hsl/.docker/desktop/docker.sock TESTCONTAINERS_RYUK_DISABLED=true mvn -B clean verify -Dapi.version=1.56` → **45/45 passed, 0 skipped**。
+
+### Independent QA remediation / 独立 QA 修复
+
+- C1：三个 JDBC adapter 统一把 `Instant` 绑定为 UTC `OffsetDateTime`。/ All three JDBC adapters bind `Instant` as UTC `OffsetDateTime`.
+- H1：四个固定宽度字段使用 Hibernate `SqlTypes.CHAR`，可执行 schema validation 通过。/ All four fixed-width mappings validate as `CHAR`.
+- M1/M2：订单保存时记录不可变 item count 并由加锁 trigger 阻止追加；复合外键保证幂等 internal/public ID 指向同一订单。/ A locked trigger prevents post-snapshot item insertion; a composite FK keeps both idempotency IDs aligned.
+- M3：Testcontainers 2.0.5、无 `disabledWithoutDocker`，并新增 GitHub Actions 门禁；Docker 缺失会失败而非跳过。/ Upgraded Testcontainers, removed silent skipping, and added a CI gate.
+- M4：聚合保留加载/成功保存时的 persisted version，允许一次 save 前多次内存变更及 no-op save，同时仍拒绝 stale writer。/ Aggregates retain the persisted baseline version, supporting multiple mutations and no-op saves while rejecting stale writers.

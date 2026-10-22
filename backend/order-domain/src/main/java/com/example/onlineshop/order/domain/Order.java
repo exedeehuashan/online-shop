@@ -18,6 +18,7 @@ public final class Order {
   private String cancellationReason;
   private Instant updatedAt;
   private long version;
+  private long persistedVersion = -1;
 
   private Order(OrderInternalId internalId, OrderId id, CustomerReference customerReference, Long customerInternalId,
                 String customerNameSnapshot, List<OrderItem> items, AddressSnapshot shippingAddress, Instant now) {
@@ -46,6 +47,21 @@ public final class Order {
   public static Order create(OrderInternalId internalId, OrderId id, CustomerReference customerReference,
                              String customerNameSnapshot, List<OrderItem> items, AddressSnapshot address, Instant now) {
     return new Order(internalId, id, customerReference, null, customerNameSnapshot, items, address, now);
+  }
+
+  public static Order reconstitute(OrderInternalId internalId, OrderId id, CustomerReference customerReference,
+                                   Long customerInternalId, String customerNameSnapshot, List<OrderItem> items,
+                                   AddressSnapshot address, OrderStatus status, String cancellationReason,
+                                   Instant createdAt, Instant updatedAt, long version) {
+    Order order = new Order(internalId, id, customerReference, customerInternalId, customerNameSnapshot, items, address, createdAt);
+    order.status = Objects.requireNonNull(status);
+    order.cancellationReason = cancellationReason;
+    order.updatedAt = Objects.requireNonNull(updatedAt);
+    if (version < 0) throw Validation.invalid("version must be non-negative");
+    order.version = version;
+    order.persistedVersion = version;
+    order.domainEvents.clear();
+    return order;
   }
 
   public void confirm(Instant now) {
@@ -77,6 +93,8 @@ public final class Order {
   public Instant createdAt() { return createdAt; }
   public Instant updatedAt() { return updatedAt; }
   public long version() { return version; }
+  public long persistedVersion() { return persistedVersion; }
+  public void markPersisted() { persistedVersion = version; }
   public List<DomainEvent> domainEvents() { return List.copyOf(domainEvents); }
   public void clearDomainEvents() { domainEvents.clear(); }
 }
