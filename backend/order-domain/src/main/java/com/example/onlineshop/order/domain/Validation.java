@@ -20,9 +20,16 @@ final class Validation {
 
   static String requiredOpaque(String value, int maxLength, String field) {
     if (value == null || value.isBlank()) throw invalid(field + " is required");
-    if (!value.equals(value.trim())) throw invalid(field + " must not have leading or trailing whitespace");
+    if (isUnicodeWhitespace(value.codePointAt(0))
+        || isUnicodeWhitespace(value.codePointBefore(value.length()))) {
+      throw invalid(field + " must not have leading or trailing whitespace");
+    }
     if (value.length() > maxLength) throw invalid(field + " exceeds " + maxLength + " characters");
     return value;
+  }
+
+  private static boolean isUnicodeWhitespace(int codePoint) {
+    return Character.isWhitespace(codePoint) || Character.isSpaceChar(codePoint);
   }
 
   static DomainValidationException invalid(String message) {

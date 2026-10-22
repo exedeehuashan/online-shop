@@ -3,8 +3,8 @@
 ## Issue #4 developer verification / Issue #4 开发者验证
 
 - 日期 / Date：2026-10-22
-- 命令 / Command：`mvn test`
-- 结果 / Result：`PASS` — 11 tests, 0 failures, 0 errors, 0 skipped.
+- 命令 / Command：`mvn -B clean verify`
+- 结果 / Result：`PASS` — 35 tests, 0 failures, 0 errors, 0 skipped.
 - 覆盖 / Coverage：金额约束与计算、订单创建不变量、重复 SKU、不可变快照、确认/取消状态机与幂等行为、应用端口编排与客户隔离、63-bit 时间有序 ID 与时钟回拨 fail-closed、ArchUnit 领域纯净性和依赖方向。/ Money constraints/calculation, order creation invariants, duplicate SKU rejection, immutable snapshots, confirm/cancel state machine and idempotent behavior, application-port orchestration and customer isolation, 63-bit time-ordered IDs with fail-closed clock rollback, and ArchUnit domain purity/dependency direction.
 - 未执行 / Not run：数据库、REST/API、Kafka、浏览器、UAT 与性能测试属于后续 Issues #5–#11。/ Database, REST/API, Kafka, browser, UAT, and performance tests belong to later Issues #5–#11.
 
@@ -28,7 +28,7 @@
 | 缺陷复现 / Defect repro | `mvn -B -pl backend/order-application -am test -Dtest=KnownDefectsQaTest -Djunit.jupiter.conditions.deactivate='*' -Dsurefire.failIfNoSpecifiedTests=false` → 3 failures |
 | 空白检查 / Whitespace | `git diff --check` → PASS |
 
-开发者基线为 11 项测试；本次 QA 新增 20 项（17 项启用 + 3 项缺陷复现默认禁用），未修改任何生产代码。/ Developer baseline was 11 tests; this QA adds 20 (17 enabled plus 3 disabled defect reproductions) without changing production code.
+当前回归套件共 35 项测试，全部启用且通过。/ The current regression suite contains 35 tests, all enabled and passing.
 
 ### Issue #4 验收矩阵 / Acceptance matrix
 
@@ -113,7 +113,7 @@
 - 日期 / Date：2026-10-22
 - 状态流转 / Status transition：`FAILED → DEVELOPING`
 - 命令 / Command：`mvn -B clean verify`
-- 结果 / Result：**BUILD SUCCESS** — 33 tests, 0 failures, 0 errors, 0 skipped（domain 12；application 21）。
+- 结果 / Result：**BUILD SUCCESS** — 35 tests, 0 failures, 0 errors, 0 skipped（domain 14；application 21）。
 - 回归 / Regression：`KnownDefectsQaTest` 的 3 个缺陷复现已取消 `@Disabled` 并成为常规构建的一部分；另增加 2 个 ID 边界测试。/ All three defect reproductions in `KnownDefectsQaTest` are enabled as normal build regressions; two additional ID boundary tests were added.
 - 空白检查 / Whitespace：`git diff --check` → **PASS**。
 
@@ -122,5 +122,7 @@
 | D1 | epoch/node 0 首个 ID 为 `1`，后续不重复；最大支持时间仍在正 63-bit 范围，越界 fail-closed。/ First ID is `1` with no duplicate; maximum supported time stays positive 63-bit and overflow fails closed. | Fixed |
 | D2 | null item/null unit price 抛 `DomainValidationException(INVALID_VALUE)`，不再泄漏 NPE。/ Null item/unit price raises the domain validation error rather than leaking NPE. | Fixed |
 | D3 | opaque reference 对空白和首尾空格显式拒绝，合法值原样保留。/ Blank or surrounding whitespace is explicitly rejected and valid opaque values are preserved. | Fixed |
+
+R1 回归补充：边界检测覆盖 Unicode whitespace（包括 U+2003 EM SPACE 与 U+00A0 NBSP），不使用 trim 或规范化；合法 opaque ID 的值与对象语义保持精确不变。/ R1 regression coverage: boundary validation handles Unicode whitespace (including U+2003 EM SPACE and U+00A0 NBSP) without trimming or normalisation; valid opaque IDs retain their exact value and identity semantics.
 
 修复严格限于 Issue #4；未触碰 Issues #5–#11，PR #19 未合并。/ Remediation is strictly scoped to Issue #4; Issues #5–#11 are untouched and PR #19 remains unmerged.
