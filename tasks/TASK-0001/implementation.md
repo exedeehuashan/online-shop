@@ -50,7 +50,7 @@
 
 ## Issue #6 implementation / Issue #6 实施
 
-- 状态 / Status：`IN_REVIEW / 待审核`；分支 / Branch：`feat/issue-6-order-rest-api`；基线 / Baseline：`f9beff8`。
+- 状态 / Status：`IN_REVIEW / 待审核`；分支 / Branch：`feat/issue-6-order-rest-api`；基线 / Baseline：`f9beff8`；交付 / Delivery：PR #21（禁止自动合并 / no auto-merge）。
 - REST/OpenAPI：新增 Spring Boot `order-api` 组合根及 `/api/v1/customers/{customerId}/orders` 创建、列表、详情、确认、取消端点；Springdoc `/v3/api-docs` 记录成功、400、422、404、409 契约及 customer ID 仅限开发/受控 UAT。/ Added the Spring Boot `order-api` composition root and approved create/list/detail/confirm/cancel endpoints; Springdoc documents success, 400, 422, 404, and 409 contracts plus the dev/controlled-UAT customer-ID restriction.
 - 幂等与事务 / Idempotency and transactions：首次创建返回 `201 + Location`；相同键与规范化请求哈希重放返回原订单 `200`。竞争失败候选通过事务回滚，不产生重复订单或 Outbox；异载荷返回 `409`。/ First create returns `201 + Location`; identical replay returns the original order with `200`. Losing candidates roll back transactionally and create neither duplicate orders nor Outbox rows; different payloads return `409`.
 - 错误与隔离 / Errors and isolation：JSON/绑定失败为 RFC 9457 `400`；领域/字段语义错误（含重复 SKU）为 `422`；不存在和非所有者均为 `404`；状态、幂等和 `If-Match` 乐观锁冲突为 `409`。/ JSON/binding failures map to RFC 9457 `400`; semantic/domain violations including duplicate SKU map to `422`; missing and unauthorized resources both map to `404`; state, idempotency, and `If-Match` optimistic-lock conflicts map to `409`.

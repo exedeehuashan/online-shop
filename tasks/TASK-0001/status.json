@@ -32,7 +32,7 @@
   "lastDesignDecisionDate": "2026-10-22",
   "currentIssue": 6,
   "currentIssueStatus": "IN_REVIEW",
-  "currentPullRequest": null,
+  "currentPullRequest": 21,
   "completedIssues": [4, 5],
   "mergedPullRequests": [18, 19, 20],
   "developerVerification": {

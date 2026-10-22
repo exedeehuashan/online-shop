@@ -155,7 +155,7 @@ R1 回归补充：边界检测通过集中 code-point predicate 覆盖完整 Uni
 
 ## Issue #6 developer verification / Issue #6 开发者验证
 
-- 日期 / Date：2026-10-23；状态 / Status：`IN_REVIEW / 待审核`。
+- 日期 / Date：2026-10-23；状态 / Status：`IN_REVIEW / 待审核`；PR：#21。
 - TDD 红灯 / TDD red：`6096e87` 先定义 4 项真实 PostgreSQL API 验收场景，再加入生产实现。/ Commit `6096e87` defined four real-PostgreSQL API acceptance scenarios before production implementation.
 - 定向命令 / Focused command：`DOCKER_HOST=unix:///home/hsl/.docker/desktop/docker.sock TESTCONTAINERS_RYUK_DISABLED=true mvn -B test -pl backend/order-api -am -Dapi.version=1.56 -Dtest=OrderApiTest -Dsurefire.failIfNoSpecifiedTests=false` → **4/4 passed, 0 skipped**。
 - 全量命令 / Full command：`DOCKER_HOST=unix:///home/hsl/.docker/desktop/docker.sock TESTCONTAINERS_RYUK_DISABLED=true mvn -B clean verify -Dapi.version=1.56` → **BUILD SUCCESS, 49/49 passed, 0 skipped/failures/errors**（domain 14、application 21、PostgreSQL persistence 10、PostgreSQL API 4）。
