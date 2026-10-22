@@ -11,6 +11,7 @@
     <module>backend/order-domain</module>
     <module>backend/order-application</module>
     <module>backend/order-adapters-persistence</module>
+    <module>backend/order-api</module>
   </modules>
   <properties>
     <maven.compiler.release>17</maven.compiler.release>
