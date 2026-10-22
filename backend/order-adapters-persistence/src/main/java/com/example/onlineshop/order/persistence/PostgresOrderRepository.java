@@ -3,7 +3,7 @@ package com.example.onlineshop.order.persistence;
 import com.example.onlineshop.order.application.*;
 import com.example.onlineshop.order.domain.*;
 import java.sql.*;
-import java.time.Instant;
+import java.time.*;
 import java.util.*;
 import org.springframework.jdbc.core.JdbcTemplate;
 
@@ -18,18 +18,19 @@ public final class PostgresOrderRepository implements OrderRepository {
   @Override public Order save(Order order) {
     Integer count = jdbc.queryForObject("select count(*) from orders where internal_id=?", Integer.class, order.internalId().value());
     if (count == 0) insert(order); else update(order);
+    order.markPersisted();
     return order;
   }
 
   private void insert(Order order) {
     AddressSnapshot a = order.shippingAddress();
     jdbc.update("""
-        insert into orders(internal_id,public_id,customer_ref,customer_internal_id,customer_name_snapshot,status,currency,total_amount,
+        insert into orders(internal_id,public_id,customer_ref,customer_internal_id,customer_name_snapshot,status,currency,total_amount,item_count,
           recipient,address_line1,address_line2,city,region,postal_code,country_code,phone,cancellation_reason,version,created_at,updated_at)
-        values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+        values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
         order.internalId().value(), order.id().value(), order.customerReference().value(), order.customerInternalId(), order.customerNameSnapshot(),
-        order.status().name(), order.total().currency(), order.total().amount(), a.recipient(), a.line1(), a.line2(), a.city(), a.region(),
-        a.postalCode(), a.countryCode(), a.phone(), order.cancellationReason().orElse(null), order.version(), order.createdAt(), order.updatedAt());
+        order.status().name(), order.total().currency(), order.total().amount(), order.items().size(), a.recipient(), a.line1(), a.line2(), a.city(), a.region(),
+        a.postalCode(), a.countryCode(), a.phone(), order.cancellationReason().orElse(null), order.version(), utc(order.createdAt()), utc(order.updatedAt()));
     for (OrderItem item : order.items()) {
       jdbc.update("""
           insert into order_items(internal_id,order_internal_id,product_ref,product_internal_id,sku,product_name_snapshot,
@@ -40,9 +41,9 @@ public final class PostgresOrderRepository implements OrderRepository {
   }
 
   private void update(Order order) {
-    long expectedVersion = order.version() - 1;
+    long expectedVersion = order.persistedVersion();
     int changed = jdbc.update("update orders set status=?,cancellation_reason=?,version=?,updated_at=? where internal_id=? and version=?",
-        order.status().name(), order.cancellationReason().orElse(null), order.version(), order.updatedAt(), order.internalId().value(), expectedVersion);
+        order.status().name(), order.cancellationReason().orElse(null), order.version(), utc(order.updatedAt()), order.internalId().value(), expectedVersion);
     if (changed != 1) throw new OptimisticOrderLockException();
   }
 
@@ -77,6 +78,7 @@ public final class PostgresOrderRepository implements OrderRepository {
         rs.getObject("updated_at",java.time.OffsetDateTime.class).toInstant());
   }
   private static Long nullableLong(ResultSet rs, String column) throws SQLException { long value=rs.getLong(column); return rs.wasNull()?null:value; }
+  private static OffsetDateTime utc(Instant value) { return OffsetDateTime.ofInstant(value, ZoneOffset.UTC); }
   private record OrderRow(long internalId, UUID publicId, String customerRef, Long customerInternalId, String customerName,
                           OrderStatus status, AddressSnapshot address, String cancellationReason, long version, Instant createdAt, Instant updatedAt) {}
 }

@@ -46,15 +46,16 @@ public final class PersistenceMappings {
     @Column(name = "customer_internal_id") Long customerInternalId;
     @Column(name = "customer_name_snapshot", nullable = false, length = 200) String customerName;
     @Column(nullable = false, length = 32) String status;
-    @Column(nullable = false, columnDefinition = "char(3)") String currency;
+    @JdbcTypeCode(SqlTypes.CHAR) @Column(nullable = false, columnDefinition = "char(3)") String currency;
     @Column(name = "total_amount", nullable = false, precision = 19, scale = 2) BigDecimal total;
+    @Column(name = "item_count", nullable = false) int itemCount;
     @Column(nullable = false, length = 200) String recipient;
     @Column(name = "address_line1", nullable = false, length = 200) String addressLine1;
     @Column(name = "address_line2", length = 200) String addressLine2;
     @Column(nullable = false, length = 100) String city;
     @Column(length = 100) String region;
     @Column(name = "postal_code", nullable = false, length = 32) String postalCode;
-    @Column(name = "country_code", nullable = false, columnDefinition = "char(2)") String countryCode;
+    @JdbcTypeCode(SqlTypes.CHAR) @Column(name = "country_code", nullable = false, columnDefinition = "char(2)") String countryCode;
     @Column(length = 32) String phone;
     @Column(name = "cancellation_reason", length = 500) String cancellationReason;
     @Version @Column(nullable = false) long version;
@@ -72,7 +73,7 @@ public final class PersistenceMappings {
     @Column(nullable = false, length = 100) String sku;
     @Column(name = "product_name_snapshot", nullable = false, length = 300) String productName;
     @Column(name = "unit_amount_snapshot", nullable = false, precision = 19, scale = 2) BigDecimal unitAmount;
-    @Column(nullable = false, columnDefinition = "char(3)") String currency;
+    @JdbcTypeCode(SqlTypes.CHAR) @Column(nullable = false, columnDefinition = "char(3)") String currency;
     @Column(nullable = false) int quantity;
     @Column(name = "line_total", nullable = false, precision = 19, scale = 2) BigDecimal lineTotal;
   }
@@ -87,7 +88,7 @@ public final class PersistenceMappings {
   @Table(name = "order_idempotency")
   static class IdempotencyMapping {
     @EmbeddedId IdempotencyKey id;
-    @Column(name = "request_hash", nullable = false, columnDefinition = "char(64)") String requestHash;
+    @JdbcTypeCode(SqlTypes.CHAR) @Column(name = "request_hash", nullable = false, columnDefinition = "char(64)") String requestHash;
     @Column(name = "order_internal_id", nullable = false) long orderInternalId;
     @Column(name = "order_public_id", nullable = false) UUID orderPublicId;
     @Column(name = "created_at", nullable = false) Instant createdAt;

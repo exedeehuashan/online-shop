@@ -1,6 +1,6 @@
 # TASK-0001：测试计划 / Test Plan
 
-> 状态 / Status：`DESIGNED / PENDING_APPROVAL`。本计划描述未来实现的测试策略；当前尚未执行测试。执行须由 tester agent 在人类明确监督下进行。/ This plan describes future testing; no tests have been executed. Execution requires a tester agent under explicit human supervision.
+> 状态 / Status：`APPROVED / IN_EXECUTION`。Issue #4 单元/应用测试及 Issue #5 PostgreSQL 集成测试已执行；后续层按对应 Issue 推进。/ Issue #4 unit/application tests and Issue #5 PostgreSQL integration tests have executed; later layers proceed in their respective issues.
 
 ## 原则
 
@@ -80,7 +80,15 @@
 | P0 | 3 | #2, #4 | IN_REVIEW / 审核中 | Hibernate/Flyway schema validate、事务安全 replay/conflict、并发幂等、乐观锁 / Hibernate/Flyway schema validation, transaction-safe replay/conflict, concurrent idempotency, optimistic locking |
 | P0 | 3 | #2, #4 | IN_REVIEW / 审核中 | Order mutation + Outbox commit/rollback 原子性 / atomic commit and rollback |
 
-执行命令 / Command：`mvn -B clean verify`。Testcontainers 使用 `postgres:16-alpine`；无 Docker daemon 时明确跳过并记录为环境阻塞，不将跳过误报为集成测试通过。/ Testcontainers uses `postgres:16-alpine`; when no Docker daemon exists it skips explicitly and is recorded as an environmental blocker, never reported as an integration-test pass.
+本机 Docker Desktop 29 精确命令 / Exact local Docker Desktop 29 command：
+
+```bash
+DOCKER_HOST=unix:///home/hsl/.docker/desktop/docker.sock \
+TESTCONTAINERS_RYUK_DISABLED=true \
+mvn -B clean verify -Dapi.version=1.56
+```
+
+Testcontainers 使用 `postgres:16-alpine`；套件不允许静默跳过，Docker 不可用时构建失败。GitHub Actions 的 `Issue 5 PostgreSQL gate` 在 Docker 可用 runner 上执行 `mvn -B clean verify`。/ Testcontainers uses `postgres:16-alpine`; silent skips are disabled and the build fails when Docker is unavailable. The GitHub Actions gate runs `mvn -B clean verify` on a Docker-enabled runner.
 
 ## 退出标准
 

@@ -7,7 +7,7 @@ Implements PostgreSQL persistence for the Order bounded context with Flyway-owne
 - **Priority / 优先级:** P0
 - **Sequence / 顺序:** 3
 - **Dependencies / 依赖:** #2, #4 (completed / 已完成)
-- **Status / 状态:** IN REVIEW — ENVIRONMENT BLOCKED FOR POSTGRES EXECUTION / 审核中—PostgreSQL 执行受环境阻塞
+- **Status / 状态:** IN REVIEW — QA REMEDIATED / 审核中—QA 缺陷已修复
 - **Scope / 范围:** Issue #5 only; Issues #6–#11 are not started. / 仅 Issue #5；未开始 Issues #6–#11。
 
 ## Changes / 变更
@@ -27,12 +27,12 @@ Implements PostgreSQL persistence for the Order bounded context with Flyway-owne
 - Implementation commit / 实现提交: `93b7883`
 - QA red-test commit / QA 红灯测试提交: `3f55c29`
 - Command / 命令: `mvn -B clean verify`
-- Result / 结果: **BUILD SUCCESS** — 45 total, 35 passed, 10 skipped, 0 failures, 0 errors. / 共 45 项，35 通过，10 跳过，0 失败，0 错误。
+- Result / 结果: **BUILD SUCCESS** — 45 total, 45 passed, 0 skipped, 0 failures, 0 errors. / 共 45 项，45 通过，0 跳过，0 失败，0 错误。
 - The ten Testcontainers PostgreSQL tests additionally cover executable ORM validation, database-enforced snapshot immutability, in-transaction idempotent replay/conflict, and concurrent claims. / 10 项 Testcontainers PostgreSQL 测试新增覆盖可执行 ORM 校验、数据库强制快照不可变、事务内幂等重放/冲突及并发 claim。
 
-## Known blocker / 已知阻塞
+## PostgreSQL gate / PostgreSQL 门禁
 
-The current host has Docker CLI 29.9.1 but no running daemon and no `/var/run/docker.sock`. The container suite therefore skips all ten PostgreSQL assertions locally; they must run in Docker-enabled CI/review before merge. The suite uses `disabledWithoutDocker=true` so skips are explicit rather than false passes. / 当前主机有 Docker CLI 29.9.1，但 daemon 未运行且不存在 `/var/run/docker.sock`。因此本地明确跳过全部 10 项 PostgreSQL 断言，合并前必须在支持 Docker 的 CI/审核环境运行，绝不将跳过误报为通过。
+Docker Desktop 29 local command / 本机命令：`DOCKER_HOST=unix:///home/hsl/.docker/desktop/docker.sock TESTCONTAINERS_RYUK_DISABLED=true mvn -B clean verify -Dapi.version=1.56`. The ten PostgreSQL tests execute (no silent skip), and `.github/workflows/issue-5-postgres.yml` provides the Docker-enabled CI gate. / 10 项 PostgreSQL 测试必须执行（不允许静默跳过），并由 GitHub Actions 提供 CI 门禁。
 
 Closes #5
 

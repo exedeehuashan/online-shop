@@ -1,0 +1,25 @@
+name: Issue 5 PostgreSQL gate
+
+on:
+  pull_request:
+    paths:
+      - "backend/order-domain/**"
+      - "backend/order-application/**"
+      - "backend/order-adapters-persistence/**"
+      - "pom.xml"
+      - ".github/workflows/issue-5-postgres.yml"
+  workflow_dispatch:
+
+jobs:
+  postgres-integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: maven
+      - name: Verify all tests (PostgreSQL tests cannot skip)
+        run: mvn -B clean verify

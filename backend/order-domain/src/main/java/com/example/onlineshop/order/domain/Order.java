@@ -18,6 +18,7 @@ public final class Order {
   private String cancellationReason;
   private Instant updatedAt;
   private long version;
+  private long persistedVersion = -1;
 
   private Order(OrderInternalId internalId, OrderId id, CustomerReference customerReference, Long customerInternalId,
                 String customerNameSnapshot, List<OrderItem> items, AddressSnapshot shippingAddress, Instant now) {
@@ -58,6 +59,7 @@ public final class Order {
     order.updatedAt = Objects.requireNonNull(updatedAt);
     if (version < 0) throw Validation.invalid("version must be non-negative");
     order.version = version;
+    order.persistedVersion = version;
     order.domainEvents.clear();
     return order;
   }
@@ -91,6 +93,8 @@ public final class Order {
   public Instant createdAt() { return createdAt; }
   public Instant updatedAt() { return updatedAt; }
   public long version() { return version; }
+  public long persistedVersion() { return persistedVersion; }
+  public void markPersisted() { persistedVersion = version; }
   public List<DomainEvent> domainEvents() { return List.copyOf(domainEvents); }
   public void clearDomainEvents() { domainEvents.clear(); }
 }

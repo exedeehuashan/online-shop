@@ -7,6 +7,7 @@ CREATE TABLE orders (
   status VARCHAR(32) NOT NULL CHECK (status IN ('DRAFT','CONFIRMED','CANCELLED')),
   currency CHAR(3) NOT NULL CHECK (currency = 'NZD'),
   total_amount NUMERIC(19,2) NOT NULL CHECK (total_amount >= 0),
+  item_count INTEGER NOT NULL CHECK (item_count > 0),
   recipient VARCHAR(200) NOT NULL,
   address_line1 VARCHAR(200) NOT NULL,
   address_line2 VARCHAR(200),
@@ -22,6 +23,7 @@ CREATE TABLE orders (
   CHECK (updated_at >= created_at),
   CHECK ((status = 'CANCELLED') = (cancellation_reason IS NOT NULL))
 );
+ALTER TABLE orders ADD CONSTRAINT ux_orders_internal_public UNIQUE(internal_id, public_id);
 CREATE INDEX ix_orders_customer_timeline ON orders(customer_ref, created_at DESC, internal_id DESC);
 
 CREATE TABLE order_items (
@@ -45,9 +47,10 @@ CREATE TABLE order_idempotency (
   idempotency_key VARCHAR(128) NOT NULL CHECK (char_length(idempotency_key) > 0),
   request_hash CHAR(64) NOT NULL CHECK (request_hash ~ '^[0-9a-f]{64}$'),
   order_internal_id BIGINT NOT NULL REFERENCES orders(internal_id),
-  order_public_id UUID NOT NULL REFERENCES orders(public_id),
+  order_public_id UUID NOT NULL,
   created_at TIMESTAMPTZ NOT NULL,
-  PRIMARY KEY(customer_ref, idempotency_key)
+  PRIMARY KEY(customer_ref, idempotency_key),
+  FOREIGN KEY(order_internal_id, order_public_id) REFERENCES orders(internal_id, public_id)
 );
 
 CREATE TABLE outbox_events (
@@ -71,11 +74,11 @@ CREATE INDEX ix_outbox_unpublished ON outbox_events(occurred_at, internal_id) WH
 CREATE FUNCTION reject_order_snapshot_change() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
   IF ROW(NEW.public_id, NEW.customer_ref, NEW.customer_internal_id, NEW.customer_name_snapshot,
-         NEW.currency, NEW.total_amount, NEW.recipient, NEW.address_line1, NEW.address_line2,
+         NEW.currency, NEW.total_amount, NEW.item_count, NEW.recipient, NEW.address_line1, NEW.address_line2,
          NEW.city, NEW.region, NEW.postal_code, NEW.country_code, NEW.phone, NEW.created_at)
      IS DISTINCT FROM
      ROW(OLD.public_id, OLD.customer_ref, OLD.customer_internal_id, OLD.customer_name_snapshot,
-         OLD.currency, OLD.total_amount, OLD.recipient, OLD.address_line1, OLD.address_line2,
+         OLD.currency, OLD.total_amount, OLD.item_count, OLD.recipient, OLD.address_line1, OLD.address_line2,
          OLD.city, OLD.region, OLD.postal_code, OLD.country_code, OLD.phone, OLD.created_at) THEN
     RAISE EXCEPTION 'order snapshots are immutable' USING ERRCODE = 'check_violation';
   END IF;
@@ -94,3 +97,19 @@ $$;
 
 CREATE TRIGGER trg_order_items_immutable BEFORE UPDATE OR DELETE ON order_items
 FOR EACH ROW EXECUTE FUNCTION reject_order_item_change();
+
+CREATE FUNCTION reject_extra_order_item() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE expected_count INTEGER;
+DECLARE existing_count INTEGER;
+BEGIN
+  SELECT item_count INTO expected_count FROM orders WHERE internal_id = NEW.order_internal_id FOR UPDATE;
+  SELECT count(*) INTO existing_count FROM order_items WHERE order_internal_id = NEW.order_internal_id;
+  IF existing_count >= expected_count THEN
+    RAISE EXCEPTION 'order item set is immutable' USING ERRCODE = 'check_violation';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER trg_order_items_no_extra BEFORE INSERT ON order_items
+FOR EACH ROW EXECUTE FUNCTION reject_extra_order_item();

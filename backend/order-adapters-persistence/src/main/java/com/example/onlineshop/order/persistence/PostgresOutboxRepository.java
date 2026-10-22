@@ -5,6 +5,7 @@ import com.example.onlineshop.order.domain.*;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.*;
+import java.time.*;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 public final class PostgresOutboxRepository implements DomainEventRepository {
@@ -19,7 +20,8 @@ public final class PostgresOutboxRepository implements DomainEventRepository {
     for (DomainEvent event : events) {
       long internalId = internalIds.nextId();
       jdbc.update("insert into outbox_events(internal_id,event_id,aggregate_type,aggregate_public_id,aggregate_internal_id,event_type,event_version,payload,occurred_at) values (?,?,?,?,?,?,?,?::jsonb,?)",
-          internalId, eventIds.nextId(), "Order", event.orderId().value(), event.orderInternalId().value(), event.eventType(), event.eventVersion(), payload(event), event.occurredAt());
+          internalId, eventIds.nextId(), "Order", event.orderId().value(), event.orderInternalId().value(), event.eventType(), event.eventVersion(), payload(event),
+          OffsetDateTime.ofInstant(event.occurredAt(), ZoneOffset.UTC));
     }
   }
   private String payload(DomainEvent event) {
