@@ -150,6 +150,10 @@ Deliver an electronics-shop Order bounded context for creating, viewing, confirm
 ### Resolution / 处理结果
 This issue duplicates #11. Keep all discussion, dependencies, and acceptance criteria on #11; no implementation is authorized here. / 本 Issue 与 #11 重复。所有讨论、依赖和验收标准集中到 #11；本 Issue 不授权任何实现。
 
+### Acceptance Criteria / 验收标准
+- [x] Duplicate status and canonical issue #11 are documented in both languages. / 已用双语记录重复状态与规范 Issue #11。
+- [x] Issue remains closed and creates no independent work. / Issue 保持关闭且不产生独立工作。
+
 ## #13 — [STORY / 故事] Create an order safely / 安全创建订单
 
 **Priority / 优先级:** P0
