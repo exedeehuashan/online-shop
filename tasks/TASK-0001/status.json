@@ -1,0 +1,22 @@
+{
+  "taskId": "TASK-0001",
+  "title": "E-Shop order module MVP",
+  "state": "DESIGNED",
+  "approvalRequired": true,
+  "approvalStatus": "PENDING",
+  "blockedOn": [
+    "REST API approval",
+    "database schema approval",
+    "module and event boundary approval",
+    "Redis and Elasticsearch deferral approval"
+  ],
+  "artifacts": [
+    "requirement.md",
+    "design.md",
+    "implementation.md",
+    "test-plan.md",
+    "test-result.md"
+  ],
+  "implementationStarted": false,
+  "testsExecuted": false
+}
