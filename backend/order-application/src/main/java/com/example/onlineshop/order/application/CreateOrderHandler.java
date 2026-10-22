@@ -12,35 +12,45 @@ public final class CreateOrderHandler implements CreateOrderUseCase {
   private final Clock clock;
   private final TransactionRunner transactions;
   private final IdempotencyRepository idempotency;
+  private final EventMetadataGenerator eventMetadata;
 
   public CreateOrderHandler(OrderRepository orders, DomainEventRepository events, InternalIdGenerator internalIds,
                             PublicIdGenerator publicIds, Clock clock) {
-    this(orders, events, internalIds, publicIds, clock, TransactionRunner.direct(), null);
+    this(orders, events, internalIds, publicIds, clock, TransactionRunner.direct(), null, EventMetadataGenerator.random());
   }
 
   public CreateOrderHandler(OrderRepository orders, DomainEventRepository events, InternalIdGenerator internalIds,
                             PublicIdGenerator publicIds, Clock clock, TransactionRunner transactions) {
-    this(orders, events, internalIds, publicIds, clock, transactions, null);
+    this(orders, events, internalIds, publicIds, clock, transactions, null, EventMetadataGenerator.random());
   }
 
   public CreateOrderHandler(OrderRepository orders, DomainEventRepository events, InternalIdGenerator internalIds,
                             PublicIdGenerator publicIds, Clock clock, TransactionRunner transactions,
                             IdempotencyRepository idempotency) {
+    this(orders, events, internalIds, publicIds, clock, transactions, idempotency, EventMetadataGenerator.random());
+  }
+
+  public CreateOrderHandler(OrderRepository orders, DomainEventRepository events, InternalIdGenerator internalIds,
+                            PublicIdGenerator publicIds, Clock clock, TransactionRunner transactions,
+                            IdempotencyRepository idempotency, EventMetadataGenerator eventMetadata) {
     this.orders = Objects.requireNonNull(orders); this.events = Objects.requireNonNull(events);
     this.internalIds = Objects.requireNonNull(internalIds); this.publicIds = Objects.requireNonNull(publicIds);
     this.clock = Objects.requireNonNull(clock);
     this.transactions = Objects.requireNonNull(transactions);
     this.idempotency = idempotency;
+    this.eventMetadata = Objects.requireNonNull(eventMetadata);
   }
 
   @Override public Order handle(CreateOrderCommand command) {
-    return transactions.execute(() -> persist(command));
+    Order order = transactions.execute(() -> persist(command));
+    order.clearDomainEvents();
+    return order;
   }
 
   public CreateOrderResult handle(CreateOrderCommand command, String key, String requestHash) {
     if (idempotency == null) throw new IllegalStateException("idempotency repository is required");
     try {
-      return transactions.execute(() -> {
+      CreateOrderResult result = transactions.execute(() -> {
         Order candidate = create(command);
         orders.save(candidate);
         IdempotencyClaim claim = idempotency.claim(command.customerReference(), key, requestHash,
@@ -49,6 +59,8 @@ public final class CreateOrderHandler implements CreateOrderUseCase {
         events.appendAll(candidate.domainEvents());
         return new CreateOrderResult(candidate, false);
       });
+      result.order().clearDomainEvents();
+      return result;
     } catch (ReplayDetected replay) {
       Order original = orders.findByIdAndCustomer(replay.orderId, new CustomerReference(command.customerReference()))
           .orElseThrow(OrderNotFoundException::new);
@@ -75,10 +87,11 @@ public final class CreateOrderHandler implements CreateOrderUseCase {
         new OrderItemInternalId(internalIds.nextId()), new ProductReference(item.productReference()), null,
         item.sku(), item.productName(), Money.nzd(item.unitPrice()), item.quantity());
     }).toList();
+    EventMetadataGenerator.EventMetadata metadata = eventMetadata.next();
     Order order = Order.create(orderInternalId, new OrderId(publicIds.nextId()),
         new CustomerReference(command.customerReference()), command.customerName(), items,
         new AddressSnapshot(address.recipient(), address.line1(), address.line2(), address.city(), address.region(),
-            address.postalCode(), address.countryCode(), address.phone()), clock.instant());
+            address.postalCode(), address.countryCode(), address.phone()), clock.instant(), metadata.eventId(), metadata.correlationId());
     return order;
   }
 

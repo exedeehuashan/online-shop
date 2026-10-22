@@ -41,12 +41,22 @@ public final class Order {
     this.status = OrderStatus.DRAFT;
     this.createdAt = Objects.requireNonNull(now);
     this.updatedAt = now;
-    this.domainEvents.add(new OrderCreated(id, internalId, now));
+    // Event creation is completed by the public factory once request metadata is available.
   }
 
   public static Order create(OrderInternalId internalId, OrderId id, CustomerReference customerReference,
                              String customerNameSnapshot, List<OrderItem> items, AddressSnapshot address, Instant now) {
-    return new Order(internalId, id, customerReference, null, customerNameSnapshot, items, address, now);
+    return create(internalId, id, customerReference, customerNameSnapshot, items, address, now, UUID.randomUUID(), UUID.randomUUID());
+  }
+
+  public static Order create(OrderInternalId internalId, OrderId id, CustomerReference customerReference,
+                             String customerNameSnapshot, List<OrderItem> items, AddressSnapshot address, Instant now,
+                             UUID eventId, UUID correlationId) {
+    Order order = new Order(internalId, id, customerReference, null, customerNameSnapshot, items, address, now);
+    order.domainEvents.add(new OrderCreated(eventId, id, internalId, 0, now, correlationId, customerReference,
+        customerNameSnapshot, items.stream().map(OrderCreated.ItemSnapshot::from).toList(), order.total,
+        address, OrderStatus.DRAFT));
+    return order;
   }
 
   public static Order reconstitute(OrderInternalId internalId, OrderId id, CustomerReference customerReference,
@@ -65,19 +75,27 @@ public final class Order {
   }
 
   public void confirm(Instant now) {
+    confirm(now, UUID.randomUUID(), UUID.randomUUID());
+  }
+
+  public void confirm(Instant now, UUID eventId, UUID correlationId) {
     Objects.requireNonNull(now);
     if (status == OrderStatus.CONFIRMED) return;
     if (status != OrderStatus.DRAFT) throw new OrderStateConflictException("cannot confirm an order in " + status + " state");
     status = OrderStatus.CONFIRMED; updatedAt = now; version++;
-    domainEvents.add(new OrderConfirmed(id, internalId, now));
+    domainEvents.add(new OrderConfirmed(eventId, id, internalId, version, now, correlationId, status));
   }
 
   public void cancel(String reason, Instant now) {
+    cancel(reason, now, UUID.randomUUID(), UUID.randomUUID());
+  }
+
+  public void cancel(String reason, Instant now, UUID eventId, UUID correlationId) {
     Objects.requireNonNull(now);
     if (status == OrderStatus.CANCELLED) return;
     String validatedReason = Validation.required(reason, 500, "cancellation reason");
     status = OrderStatus.CANCELLED; cancellationReason = validatedReason; updatedAt = now; version++;
-    domainEvents.add(new OrderCancelled(id, internalId, now, validatedReason));
+    domainEvents.add(new OrderCancelled(eventId, id, internalId, version, now, correlationId, status, validatedReason));
   }
 
   public OrderInternalId internalId() { return internalId; }

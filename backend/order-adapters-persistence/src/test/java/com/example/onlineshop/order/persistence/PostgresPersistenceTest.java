@@ -16,6 +16,8 @@ import org.junit.jupiter.api.Test;
 import org.postgresql.ds.PGSimpleDataSource;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DataSourceTransactionManager;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -69,6 +71,40 @@ class PostgresPersistenceTest {
 
   @Test void hibernateMappingsValidateAgainstFlywaySchema() {
     assertThatCode(() -> PersistenceMappings.validate(dataSource)).doesNotThrowAnyException();
+  }
+
+  @Test void migratesValidV1HistoryWithDeterministicBackfill() {
+    String schema = "upgrade_" + UUID.randomUUID().toString().replace("-", "");
+    PGSimpleDataSource source = schemaDataSource(schema);
+    Flyway.configure().dataSource(source).schemas(schema).createSchemas(true).target("1").load().migrate();
+    JdbcTemplate old = new JdbcTemplate(source);
+    UUID aggregate = UUID.randomUUID();
+    UUID createdId = UUID.randomUUID();
+    UUID confirmedId = UUID.randomUUID();
+    old.update("""
+        insert into outbox_events(internal_id,event_id,aggregate_type,aggregate_public_id,aggregate_internal_id,
+          event_type,event_version,payload,occurred_at) values (1,?,'Order',?,10,'OrderCreated',1,'{}',?),
+          (2,?,'Order',?,10,'OrderConfirmed',1,'{}',?)""",
+        createdId, aggregate, OffsetDateTime.parse("2026-10-22T00:00:00Z"),
+        confirmedId, aggregate, OffsetDateTime.parse("2026-10-22T00:00:00Z"));
+    Flyway.configure().dataSource(source).schemas(schema).load().migrate();
+    assertThat(old.queryForList("select aggregate_version from outbox_events order by aggregate_version", Long.class))
+        .containsExactly(0L, 1L);
+    assertThat(old.queryForObject("select correlation_id from outbox_events where aggregate_version=0", UUID.class))
+        .isEqualTo(createdId);
+  }
+
+  @Test void rejectsAmbiguousV1HistoryDuringMigration() {
+    String schema = "ambiguous_" + UUID.randomUUID().toString().replace("-", "");
+    PGSimpleDataSource source = schemaDataSource(schema);
+    Flyway.configure().dataSource(source).schemas(schema).createSchemas(true).target("1").load().migrate();
+    JdbcTemplate old = new JdbcTemplate(source);
+    UUID aggregate = UUID.randomUUID();
+    old.update("""
+        insert into outbox_events(internal_id,event_id,aggregate_type,aggregate_public_id,aggregate_internal_id,
+          event_type,event_version,payload,occurred_at) values (1,gen_random_uuid(),'Order',?,10,'OrderConfirmed',1,'{}',now())""", aggregate);
+    assertThatThrownBy(() -> Flyway.configure().dataSource(source).schemas(schema).load().migrate())
+        .hasMessageContaining("ambiguous outbox aggregate history");
   }
 
   @Test void roundTripsImmutableSnapshotsAndPagesNewestFirst() {
@@ -147,6 +183,40 @@ class PostgresPersistenceTest {
     assertThat(jdbc.queryForObject("select count(*) from outbox_events", Integer.class)).isOne();
   }
 
+  @Test void persistsCompleteVersionedPayloadsInAggregateOrderAndMakesHistoryImmutable() throws Exception {
+    Instant sameTime = Instant.parse("2026-10-22T00:00:00Z");
+    Order order = sample(46, "46464646-4646-4646-4646-464646464646", sameTime);
+    orders.save(order);
+    outbox.appendAll(order.domainEvents());
+    JsonNode created = new ObjectMapper().readTree(jdbc.queryForObject(
+        "select payload::text from outbox_events where aggregate_version=0", String.class));
+    assertThat(created.path("customer").path("reference").asText()).isEqualTo("customer-1");
+    assertThat(created.path("items").get(0).path("productReference").asText()).isEqualTo("product-1");
+    assertThat(created.path("items").get(0).path("unitPrice").path("amount").decimalValue()).isEqualByComparingTo("99.90");
+    assertThat(created.path("shippingAddress").get("line2").isNull()).isTrue();
+    assertThat(created.has("internalId")).isFalse();
+
+    order.clearDomainEvents(); order.confirm(sameTime); orders.save(order); outbox.appendAll(order.domainEvents());
+    order.clearDomainEvents(); order.cancel("Changed mind", sameTime); orders.save(order); outbox.appendAll(order.domainEvents());
+    assertThat(jdbc.queryForList("select aggregate_version from outbox_events order by aggregate_version", Long.class))
+        .containsExactly(0L, 1L, 2L);
+    assertThat(jdbc.queryForList("select correlation_id from outbox_events", UUID.class)).doesNotContainNull();
+    assertThatThrownBy(() -> jdbc.update("update outbox_events set payload='{}'::jsonb where aggregate_version=0"));
+    assertThatThrownBy(() -> jdbc.update("delete from outbox_events where aggregate_version=0"));
+    assertThatCode(() -> jdbc.update("update outbox_events set attempts=attempts+1 where aggregate_version=0"))
+        .doesNotThrowAnyException();
+  }
+
+  @Test void databaseRejectsDuplicateAggregateVersionAndInvalidEnvelopeContract() {
+    Order order = sample(47, "47474747-4747-4747-4747-474747474747", Instant.parse("2026-10-22T00:00:00Z"));
+    orders.save(order); outbox.appendAll(order.domainEvents());
+    assertThatThrownBy(() -> outbox.appendAll(order.domainEvents()));
+    assertThatThrownBy(() -> jdbc.update("""
+        insert into outbox_events(internal_id,event_id,aggregate_type,aggregate_public_id,aggregate_internal_id,
+          aggregate_version,event_type,event_version,correlation_id,payload,occurred_at)
+        values (9999,gen_random_uuid(),'Wrong',gen_random_uuid(),9999,-1,'Bad',1,gen_random_uuid(),'null'::jsonb,now())"""));
+  }
+
   @Test void idempotencyClaimReplaysSameHashAndRejectsDifferentHash() {
     PostgresIdempotencyRepository idempotency = new PostgresIdempotencyRepository(jdbc);
     Order order = sample(50, "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee", Instant.parse("2026-10-22T00:00:00Z")); orders.save(order);
@@ -208,5 +278,13 @@ class PostgresPersistenceTest {
     return Order.create(new OrderInternalId(internalId), new OrderId(UUID.fromString(publicId)), new CustomerReference("customer-1"), "Ada",
         List.of(new OrderItem(new OrderItemInternalId(internalId + 1), new ProductReference("product-1"), null, "SKU-1", "Phone", Money.nzd(new BigDecimal("99.90")), 2)),
         new AddressSnapshot("Ada", "1 Queen St", null, "Auckland", null, "1010", "NZ", null), at);
+  }
+
+  private static PGSimpleDataSource schemaDataSource(String schema) {
+    PGSimpleDataSource source = new PGSimpleDataSource();
+    String url = POSTGRES.getJdbcUrl();
+    source.setURL(url + (url.contains("?") ? "&" : "?") + "currentSchema=" + schema);
+    source.setUser(POSTGRES.getUsername()); source.setPassword(POSTGRES.getPassword());
+    return source;
   }
 }
