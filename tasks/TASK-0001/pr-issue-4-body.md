@@ -15,7 +15,7 @@ Bootstrap the approved Order domain and application boundary. / 建立已批准�
 
 ## TDD and verification / TDD 与验证
 
-- Red: behavior tests were introduced before production types and failed on the missing model/application API. / 红灯：先添加行为测试，因领域和应用类型尚不存在而失败。
+- Red: behavior tests referencing not-yet-existing production types were introduced first; the initial Maven run stopped during dependency bootstrap before compilation. / 红灯：先添加引用尚不存在生产类型的行为测试；首次 Maven 执行在编译前的依赖引导阶段中止。
 - Green/refactor: added the minimum implementation, then introduced transaction composition and explicit event versions. / 绿灯与重构：添加最小实现，再补充事务组合与显式事件版本。
 - `mvn verify` — PASS, 11 tests, 0 failures/errors/skips. / 通过，11 项测试，无失败、错误或跳过。
 - `git diff --check` — PASS. / 通过。
