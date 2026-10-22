@@ -19,6 +19,23 @@ class OrderTest {
     assertThatThrownBy(() -> order.items().add(item(13, "X", "1.00", 1))).isInstanceOf(UnsupportedOperationException.class);
   }
 
+  @Test void capturesVersionedCreatedEnvelopeMetadataAndDeepSnapshot() {
+    UUID eventId = UUID.fromString("11111111-1111-1111-1111-111111111111");
+    UUID correlationId = UUID.fromString("22222222-2222-2222-2222-222222222222");
+    List<OrderItem> source = new java.util.ArrayList<>(List.of(item(11, "PHONE-1", "10.00", 2)));
+    Order order = Order.create(new OrderInternalId(10), new OrderId(UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")),
+        new CustomerReference("customer-1"), "Ada", source,
+        new AddressSnapshot("Ada", "1 Queen St", null, "Auckland", null, "1010", "NZ", null), NOW,
+        eventId, correlationId);
+    OrderCreated created = (OrderCreated) order.domainEvents().get(0);
+    source.clear();
+    assertThat(created.eventId()).isEqualTo(eventId);
+    assertThat(created.correlationId()).isEqualTo(correlationId);
+    assertThat(created.aggregateVersion()).isZero();
+    assertThat(created.items()).hasSize(1);
+    assertThatThrownBy(() -> created.items().clear()).isInstanceOf(UnsupportedOperationException.class);
+  }
+
   @Test void rejectsEmptyOrdersAndDuplicateSkus() {
     assertThatThrownBy(() -> validOrder(List.of())).isInstanceOf(DomainValidationException.class).extracting("code").isEqualTo(DomainErrorCode.EMPTY_ORDER);
     assertThatThrownBy(() -> validOrder(List.of(item(11, "PHONE-1", "1.00", 1), item(12, "PHONE-1", "2.00", 1))))

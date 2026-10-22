@@ -22,7 +22,8 @@ class OrderApplicationTest {
     assertThat(created.internalId().value()).isEqualTo(100L);
     assertThat(created.items().get(0).internalId().value()).isEqualTo(101L);
     assertThat(orders.saved).isSameAs(created);
-    assertThat(events.saved).containsExactlyElementsOf(created.domainEvents());
+    assertThat(events.saved).singleElement().isInstanceOf(OrderCreated.class);
+    assertThat(created.domainEvents()).isEmpty();
   }
 
   @Test void commandHandlersEnforceOwnershipAndDelegateTransitions() {
