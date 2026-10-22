@@ -79,3 +79,26 @@
 - API/事件契约通过，主要错误分支已测试。
 - 性能基线被记录，未出现数据损坏或资源持续泄漏。
 
+
+## Issue #4 独立 QA 执行计划 / Independent QA execution plan (PR #19)
+
+> 范围 / Scope：仅 `feat/issue-4-order-domain-application`（PR #19）的领域层与应用层。持久化、REST、Kafka、前端、Docker、UAT 与性能不在本次范围。/ Only the domain and application layers of PR #19; persistence, REST, Kafka, frontend, Docker, UAT, and performance are out of scope.
+
+### 验证目标 / Verification objectives
+
+| 目标 / Objective | 方法 / Method | 证据 / Evidence |
+|---|---|---|
+| Issue #4 验收标准 / Issue #4 acceptance criteria | 逐条对照代码与测试 / criterion-by-criterion review | 验收矩阵 / acceptance matrix |
+| DDD 边界与不变量 / DDD boundaries and invariants | 聚合、值对象、端口审查 / aggregate, value-object, port review | 新增领域 QA 测试 / new domain QA tests |
+| 状态机 / State machine | 穷举合法/非法/幂等转换 / legal, illegal, idempotent transitions | `OrderTest`, `OrderDomainQaTest` |
+| 组合优于继承 / Composition over inheritance | 继承层级、final、端口注入审查 / hierarchy and injection review | 类声明审查 / class declaration review |
+| 模块依赖方向 / Module dependency direction | ArchUnit + 手工 import 检查 / ArchUnit plus import review | `ArchitectureTest` |
+| ID 生成器边界 / ID generator boundaries | epoch、node、sequence、回拨、63-bit 上限 / epoch, node, sequence, rollback, 63-bit max | `IdGeneratorQaTest` |
+| 应用层编排与所有权 / Orchestration and ownership | 内存适配器全链路 + 跨客户访问 / in-memory full flow plus cross-customer access | `OrderApplicationQaTest` |
+| 构建门禁 / Build gate | `mvn clean verify` | 构建日志 / build log |
+
+### 退出标准 / Exit criteria
+
+- `mvn clean verify` 通过；无 Critical/High 缺陷。/ `mvn clean verify` green; no Critical/High defects.
+- 每个发现附可复现命令与期望/实际结果。/ Every finding has a reproducible command with expected/actual results.
+- 未修改业务逻辑以迎合测试。/ No business logic changed to satisfy tests.
