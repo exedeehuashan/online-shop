@@ -126,3 +126,14 @@
 R1 回归补充：边界检测通过集中 code-point predicate 覆盖完整 Unicode `White_Space` 集合（包括 U+0085 NEL、U+2003 EM SPACE 与 U+00A0 NBSP），不使用 trim 或规范化；`CustomerReference` 与 `ProductReference` 均覆盖 U+0085 首尾边界，内部 U+0085 保持精确不变。/ R1 regression coverage: a central code-point predicate handles the complete Unicode `White_Space` set (including U+0085 NEL, U+2003 EM SPACE, and U+00A0 NBSP) without trimming or normalisation; both reference types cover U+0085 at either boundary and preserve an internal U+0085 exactly.
 
 修复严格限于 Issue #4；未触碰 Issues #5–#11，PR #19 未合并。/ Remediation is strictly scoped to Issue #4; Issues #5–#11 are untouched and PR #19 remains unmerged.
+
+## Issue #5 developer verification / Issue #5 开发者验证
+
+- 日期 / Date：2026-10-22
+- 优先级 / Priority：P0；顺序 / Sequence：3；依赖 / Dependencies：#2、#4；状态 / Status：`PARTIAL / ENVIRONMENT_BLOCKED`。
+- 命令 / Command：`mvn -B clean verify`
+- 构建结果 / Build result：**BUILD SUCCESS**。
+- 测试结果 / Test result：41 total；35 passed；6 Testcontainers tests skipped；0 failures；0 errors。领域 14、应用 21 均通过。/ 41 total; 35 passed; 6 Testcontainers tests skipped; 0 failures; 0 errors. All 14 domain and 21 application tests passed.
+- PostgreSQL 集成 / PostgreSQL integration：**未执行 / NOT EXECUTED**。主机安装 Docker CLI 29.9.1，但 `/var/run/docker.sock` 不存在且 daemon 不运行；原始运行以 `Could not find a valid Docker environment` 失败。套件使用 `disabledWithoutDocker=true`，使非 Docker 环境的普通构建保持可用，同时 Docker/CI 环境会执行全部 6 项。/ Docker CLI 29.9.1 is installed, but `/var/run/docker.sock` is absent and the daemon is not running. The original run failed with `Could not find a valid Docker environment`. `disabledWithoutDocker=true` keeps ordinary non-Docker builds usable while all six tests execute in Docker-enabled CI.
+- 待验证 / Pending evidence：真实 PostgreSQL 上的 migration、constraints/indexes、snapshot round-trip、paging、optimistic locking、idempotency，以及 Order + Outbox commit/rollback。/ Migration, constraints/indexes, snapshot round-trip, paging, optimistic locking, idempotency, and Order + Outbox commit/rollback still require a Docker-enabled run.
+- 空白检查 / Whitespace：`git diff --check` → PASS。

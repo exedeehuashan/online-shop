@@ -31,14 +31,17 @@
   "lastReviewedAgainstIssues": "1-17",
   "lastDesignDecisionDate": "2026-10-22",
   "currentIssue": 5,
-  "currentIssueStatus": "DEVELOPING",
+  "currentIssueStatus": "IN_REVIEW_ENVIRONMENT_BLOCKED",
   "currentPullRequest": null,
   "completedIssues": [4],
   "mergedPullRequests": [18, 19],
   "developerVerification": {
     "command": "mvn -B clean verify",
     "result": "PASS",
-    "tests": 35,
+    "tests": 41,
+    "passed": 35,
+    "skipped": 6,
+    "integrationBlocker": "Docker daemon unavailable; six PostgreSQL Testcontainers tests not executed",
     "date": "2026-10-22"
   }
 }
