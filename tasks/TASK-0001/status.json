@@ -31,18 +31,18 @@
   "lastReviewedAgainstIssues": "1-17",
   "lastDesignDecisionDate": "2026-10-22",
   "currentIssue": 6,
-  "currentIssueStatus": "DEVELOPING_DELEGATED",
-  "currentPullRequest": null,
+  "currentIssueStatus": "IN_REVIEW",
+  "currentPullRequest": 21,
   "completedIssues": [4, 5],
   "mergedPullRequests": [18, 19, 20],
   "developerVerification": {
     "command": "DOCKER_HOST=unix:///home/hsl/.docker/desktop/docker.sock TESTCONTAINERS_RYUK_DISABLED=true mvn -B clean verify -Dapi.version=1.56",
     "result": "PASS",
-    "tests": 45,
-    "passed": 45,
+    "tests": 49,
+    "passed": 49,
     "skipped": 0,
     "integrationBlocker": null,
-    "postgresqlIntegration": "PASS: 10/10 Testcontainers tests executed against PostgreSQL 16.15",
+    "postgresqlIntegration": "PASS: 10/10 persistence plus 4/4 API Testcontainers tests executed against PostgreSQL 16.15",
     "date": "2026-10-23"
   }
 }

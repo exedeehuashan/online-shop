@@ -47,3 +47,12 @@
 - 人工批准 / Human approval：用户于 2026-10-23 批准合并 PR #20 并启动 Issue #6。/ The user approved merging PR #20 and starting Issue #6 on 2026-10-23.
 - 合并 / Merge：PR #20 已合并至 `main`，merge commit 为 `bacde8d0ea2f8158016dc34a45294d4b1787834d`。/ PR #20 was merged into `main` with merge commit `bacde8d0ea2f8158016dc34a45294d4b1787834d`.
 - Issue #6 状态 / Issue #6 status：`DEVELOPING / 开发中`；由明确指定的 developer agent 在独立功能分支实施版本化订单 REST API 与 OpenAPI，通过 PR 交付，不自动合并。/ An explicitly assigned developer agent implements the versioned order REST API and OpenAPI on a feature branch for delivery by PR, with no automatic merge.
+
+## Issue #6 implementation / Issue #6 实施
+
+- 状态 / Status：`IN_REVIEW / 待审核`；分支 / Branch：`feat/issue-6-order-rest-api`；基线 / Baseline：`f9beff8`；交付 / Delivery：PR #21（禁止自动合并 / no auto-merge）。
+- REST/OpenAPI：新增 Spring Boot `order-api` 组合根及 `/api/v1/customers/{customerId}/orders` 创建、列表、详情、确认、取消端点；Springdoc `/v3/api-docs` 记录成功、400、422、404、409 契约及 customer ID 仅限开发/受控 UAT。/ Added the Spring Boot `order-api` composition root and approved create/list/detail/confirm/cancel endpoints; Springdoc documents success, 400, 422, 404, and 409 contracts plus the dev/controlled-UAT customer-ID restriction.
+- 幂等与事务 / Idempotency and transactions：首次创建返回 `201 + Location`；相同键与规范化请求哈希重放返回原订单 `200`。竞争失败候选通过事务回滚，不产生重复订单或 Outbox；异载荷返回 `409`。/ First create returns `201 + Location`; identical replay returns the original order with `200`. Losing candidates roll back transactionally and create neither duplicate orders nor Outbox rows; different payloads return `409`.
+- 错误与隔离 / Errors and isolation：JSON/绑定失败为 RFC 9457 `400`；领域/字段语义错误（含重复 SKU）为 `422`；不存在和非所有者均为 `404`；状态、幂等和 `If-Match` 乐观锁冲突为 `409`。/ JSON/binding failures map to RFC 9457 `400`; semantic/domain violations including duplicate SKU map to `422`; missing and unauthorized resources both map to `404`; state, idempotency, and `If-Match` optimistic-lock conflicts map to `409`.
+- 边界 / Boundary：响应只包含 UUID/opaque public IDs，不暴露 BIGINT；未实现认证、可信 Catalog 定价、Kafka publisher、前端或 Issues #7–#11，未部署、未自动合并。/ Responses expose only UUID/opaque public IDs, never BIGINTs; authentication, trusted Catalog pricing, Kafka publishing, frontend, and Issues #7–#11 remain out of scope, with no deployment or auto-merge.
+- TDD / TDD：红灯契约提交 `6096e87` 先加入 PostgreSQL API 验收测试；随后以最小应用端口、事务编排和 Web adapter 转绿。/ Red contract commit `6096e87` added PostgreSQL API acceptance tests first; minimum application ports, transaction orchestration, and web adapter then made them green.

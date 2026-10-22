@@ -19,6 +19,7 @@ public final class CancelOrderHandler implements CancelOrderUseCase {
     Objects.requireNonNull(command, "command");
     Order order = orders.findByIdAndCustomer(Objects.requireNonNull(command.orderId()), new CustomerReference(command.customerReference()))
         .orElseThrow(OrderNotFoundException::new);
+    if (command.expectedVersion() != null && command.expectedVersion() != order.version()) throw new OptimisticOrderLockException();
     order.clearDomainEvents(); order.cancel(command.reason(), clock.instant());
     if (order.domainEvents().isEmpty()) return order;
     Order saved = orders.save(order); events.appendAll(order.domainEvents()); return saved;

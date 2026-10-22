@@ -78,6 +78,7 @@
 | P0 | 3 | #2, #4 | IN_REVIEW / 审核中 | 空库 Flyway migration、约束与双索引 / empty-database migration, constraints, dual indexes |
 | P0 | 3 | #2, #4 | IN_REVIEW / 审核中 | repository round-trip、数据库强制不可变快照、稳定分页 / repository round-trip, database-enforced immutable snapshots, stable paging |
 | P0 | 3 | #2, #4 | IN_REVIEW / 审核中 | Hibernate/Flyway schema validate、事务安全 replay/conflict、并发幂等、乐观锁 / Hibernate/Flyway schema validation, transaction-safe replay/conflict, concurrent idempotency, optimistic locking |
+| P0 | 4 | #2, #4, #5 | IN_REVIEW / 审核中 | `/api/v1` 成功流、400/422、重复 SKU、201/200 replay、所有权 404、幂等/状态/版本 409、OpenAPI / success, validation, replay, ownership, conflicts, and OpenAPI |
 | P0 | 3 | #2, #4 | IN_REVIEW / 审核中 | Order mutation + Outbox commit/rollback 原子性 / atomic commit and rollback |
 
 本机 Docker Desktop 29 精确命令 / Exact local Docker Desktop 29 command：

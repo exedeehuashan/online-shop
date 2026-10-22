@@ -7,10 +7,10 @@ import java.time.*;
 import java.util.UUID;
 import org.springframework.jdbc.core.JdbcTemplate;
 
-public final class PostgresIdempotencyRepository {
+public final class PostgresIdempotencyRepository implements IdempotencyRepository {
   private final JdbcTemplate jdbc;
   public PostgresIdempotencyRepository(JdbcTemplate jdbc) { this.jdbc = jdbc; }
-  public IdempotencyClaim claim(String customer, String key, String hash, OrderInternalId internalId,
+  @Override public IdempotencyClaim claim(String customer, String key, String hash, OrderInternalId internalId,
                                 OrderId publicId, Instant at) {
     int inserted = jdbc.update("""
         insert into order_idempotency(customer_ref,idempotency_key,request_hash,order_internal_id,order_public_id,created_at)

@@ -152,3 +152,12 @@ R1 回归补充：边界检测通过集中 code-point predicate 覆盖完整 Uni
 - M1/M2：订单保存时记录不可变 item count 并由加锁 trigger 阻止追加；复合外键保证幂等 internal/public ID 指向同一订单。/ A locked trigger prevents post-snapshot item insertion; a composite FK keeps both idempotency IDs aligned.
 - M3：Testcontainers 2.0.5、无 `disabledWithoutDocker`，并新增 GitHub Actions 门禁；Docker 缺失会失败而非跳过。/ Upgraded Testcontainers, removed silent skipping, and added a CI gate.
 - M4：聚合保留加载/成功保存时的 persisted version，允许一次 save 前多次内存变更及 no-op save，同时仍拒绝 stale writer。/ Aggregates retain the persisted baseline version, supporting multiple mutations and no-op saves while rejecting stale writers.
+
+## Issue #6 developer verification / Issue #6 开发者验证
+
+- 日期 / Date：2026-10-23；状态 / Status：`IN_REVIEW / 待审核`；PR：#21。
+- TDD 红灯 / TDD red：`6096e87` 先定义 4 项真实 PostgreSQL API 验收场景，再加入生产实现。/ Commit `6096e87` defined four real-PostgreSQL API acceptance scenarios before production implementation.
+- 定向命令 / Focused command：`DOCKER_HOST=unix:///home/hsl/.docker/desktop/docker.sock TESTCONTAINERS_RYUK_DISABLED=true mvn -B test -pl backend/order-api -am -Dapi.version=1.56 -Dtest=OrderApiTest -Dsurefire.failIfNoSpecifiedTests=false` → **4/4 passed, 0 skipped**。
+- 全量命令 / Full command：`DOCKER_HOST=unix:///home/hsl/.docker/desktop/docker.sock TESTCONTAINERS_RYUK_DISABLED=true mvn -B clean verify -Dapi.version=1.56` → **BUILD SUCCESS, 49/49 passed, 0 skipped/failures/errors**（domain 14、application 21、PostgreSQL persistence 10、PostgreSQL API 4）。
+- API 覆盖 / API coverage：创建/列表/详情/确认/取消；首次 `201`、原标识重放 `200` 且数据库仅一单一 Outbox；JSON `400`、语义及重复 SKU `422`；不存在/越权 `404`；幂等与 `If-Match` 乐观锁 `409`；OpenAPI 路径及 dev/UAT 限制。/ Covers all five endpoints, 201/200 replay with one order/outbox, 400/422 including duplicate SKU, indistinguishable ownership 404s, idempotency/version 409s, and OpenAPI.
+- 空白检查 / Whitespace：`git diff --check` → PASS。

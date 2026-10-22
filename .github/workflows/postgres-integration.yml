@@ -1,4 +1,4 @@
-name: Issue 5 PostgreSQL gate
+name: PostgreSQL integration gate
 
 on:
   pull_request:
@@ -6,8 +6,9 @@ on:
       - "backend/order-domain/**"
       - "backend/order-application/**"
       - "backend/order-adapters-persistence/**"
+      - "backend/order-api/**"
       - "pom.xml"
-      - ".github/workflows/issue-5-postgres.yml"
+      - ".github/workflows/postgres-integration.yml"
   workflow_dispatch:
 
 jobs:
