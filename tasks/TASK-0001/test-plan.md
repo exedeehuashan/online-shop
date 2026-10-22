@@ -1,36 +1,47 @@
-# TASK-0001：测试计划
+# TASK-0001：测试计划 / Test Plan
 
-> 本计划描述未来实现的测试策略；当前尚未执行测试。
+> 状态 / Status：`DESIGNED / PENDING_APPROVAL`。本计划描述未来实现的测试策略；当前尚未执行测试。执行须由 tester agent 在人类明确监督下进行。/ This plan describes future testing; no tests have been executed. Execution requires a tester agent under explicit human supervision.
 
 ## 原则
 
 - 严格 TDD：先写失败测试，再写最小实现，最后重构。
 - 测试行为和契约，避免绑定内部实现。
 - 优先确定性测试：注入 Clock/ID，禁止固定 sleep。
-- 真实 PostgreSQL/Kafka 行为使用 Testcontainers，避免以内存替身掩盖差异。
+- 真实 PostgreSQL 行为使用 Testcontainers，避免以内存替身掩盖差异；Kafka publisher 已延后，不属于 MVP 测试门禁。
 
 ## 测试金字塔
 
 1. **领域单元测试（最多）**：Money、OrderItem、Order 不变量、状态机、幂等行为。
 2. **应用组件测试**：用 fake ports 验证 handler 编排、事务结果和错误映射。
-3. **适配器集成测试**：Flyway、repository、乐观锁、唯一键、Outbox、Kafka 发布。
+3. **适配器集成测试**：Flyway、repository、乐观锁、唯一键、双 ID/索引和同事务 Outbox 写入。
 4. **API/契约测试**：OpenAPI、Problem Details、headers、JSON schema、事件兼容性。
 5. **前端组件测试**：表单、状态、可访问性、TanStack Query 行为。
 6. **Playwright E2E（少量）**：创建 -> 查看 -> 确认；创建 -> 取消；失败恢复。
 7. **UAT**：按 User Story 的 Given/When/Then，在类生产 Compose 环境执行。
 8. **压力测试**：读写混合、幂等重放、热点客户、并发状态冲突和稳定性。
 
+## 需求追踪 / Requirements traceability
+
+| Story | 主要层级 / Primary levels | Future issue |
+|---|---|---|
+| US-01 创建 / Create | domain, API, PostgreSQL, idempotency, E2E | #13, #4–#6, #9 |
+| US-02 查询 / View | repository pagination, API ownership, UI/E2E | #14, #5–#6, #8–#9 |
+| US-03 确认 / Confirm | state machine, optimistic lock, event contract | #15, #4, #6–#9 |
+| US-04 取消 / Cancel | state machine, reason validation, event contract, UI | #16, #4, #6–#9 |
+| US-05 质量资产 / Quality assets | integration, contracts, Playwright, UAT, performance | #17, #9–#11 |
+
 ## 核心测试矩阵
 
 | 场景 | 层级 | 关键断言 |
 |---|---|---|
-| 创建合法订单 | unit/API/integration/E2E | 总额、DRAFT、201、唯一数据/事件 |
-| 空项/负价格/零数量 | unit/API | 拒绝且不持久化 |
-| 幂等重放 | integration/API/perf | 单订单、单事件、稳定响应 |
+| 创建合法订单 | unit/API/integration/E2E | 总额、DRAFT、201、唯一订单/Outbox 记录、快照不可变 |
+| 空项/负价格/零数量/重复 SKU | unit/API | 422 且不持久化；不可解析请求为 400 |
+| 幂等重放 | integration/API/perf | 200、同一订单/Outbox 记录、稳定响应 |
 | 相同键不同载荷 | integration/API | 409 |
 | 确认/取消状态机 | unit/API | 合法转换、终态幂等、非法 409 |
 | 并发确认和取消 | integration/perf | 一个胜出，另一个 409，无丢失更新 |
-| Outbox 发布失败/重试 | integration | DB 已提交、最终发布、可重复但不丢失 |
+| Outbox 原子写入 | integration | 订单与 Outbox 同成同败；本 MVP 不断言 Kafka 发布 |
+| 时间有序内部 ID | unit/integration | 并发唯一、近似有序、node 冲突约束、时钟回拨 fail-closed |
 | 客户隔离 | API/security | 非所有者得到 404 |
 | 分页稳定性 | integration/API | 排序稳定、边界正确 |
 | UI 主流程 | Playwright | 可访问交互、无脆弱等待 |
@@ -47,12 +58,16 @@
 - 工作负载：70% 列表/详情、20% 创建、5% 确认、5% 取消。
 - 阶段：smoke -> baseline -> load -> spike -> soak。
 - 初始目标：错误率 < 1%；读取 P95 < 300ms；写入 P95 < 500ms；无数据不变量破坏。目标需在确定硬件/并发后批准。
-- 单独观测数据库连接、Outbox lag、Kafka publish latency、JVM/GC。
+- 单独观测数据库连接、Outbox 未发布数量、JVM/GC；Kafka publish latency 延后到 publisher 增量。
 
 ## 执行门禁
 
+- Gate 0: 人类批准 #2 并将 TASK-0001 由 `PENDING_APPROVAL` 转为 `APPROVED`；此前不得编写或执行实现测试。
+- Gate 1: developer agent 按 TDD 提交失败测试与最小实现 PR；tester agent 独立审查验收映射。
+- Gate 2: 禁止 developer/tester agent 自动合并、部署或使用生产数据；所有活动均需明确人类监督。
+
 - PR：单元、组件、静态检查、架构规则。
-- 合并前：PostgreSQL/Kafka 集成与契约测试。
+- 合并前：PostgreSQL、Outbox 与 API/事件存储契约测试。
 - 候选版本：Playwright E2E 和 UAT。
 - 按需/夜间：压力与 soak。
 
