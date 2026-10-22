@@ -32,6 +32,7 @@
   "lastDesignDecisionDate": "2026-10-22",
   "currentIssue": 4,
   "currentIssueStatus": "IN_REVIEW",
+  "currentPullRequest": 19,
   "developerVerification": {
     "command": "mvn test",
     "result": "PASS",
