@@ -41,3 +41,9 @@
 - ORM/Flyway ownership：显式 Hibernate mappings 在 Testcontainers 启动时以 `validate` 对 Flyway schema 执行真实校验，绝不生成 DDL；Flyway 为唯一 schema owner。/ Explicit Hibernate mappings execute real `validate` against the Flyway schema during Testcontainers startup and never generate DDL; Flyway remains the sole schema owner.
 - 修复 TDD / Remediation TDD：提交 `3f55c29` 记录 QA 缺陷的失败测试，后续实现提交修复。/ Commit `3f55c29` records failing tests for the QA findings before the remediation implementation.
 - 真实数据库验证 / Real database verification：2026-10-23 在 Docker Engine 29.8.2 上执行 PostgreSQL 16.15；定向 Testcontainers 套件 10/10 通过，完整 `mvn clean verify` 45/45 通过，均为 0 skipped。/ On 2026-10-23 PostgreSQL 16.15 ran on Docker Engine 29.8.2; the focused Testcontainers suite passed 10/10 and the full clean verification passed 45/45, both with zero skipped tests.
+
+## Issue #5 completion and Issue #6 start / Issue #5 完成与 Issue #6 启动
+
+- 人工批准 / Human approval：用户于 2026-10-23 批准合并 PR #20 并启动 Issue #6。/ The user approved merging PR #20 and starting Issue #6 on 2026-10-23.
+- 合并 / Merge：PR #20 已合并至 `main`，merge commit 为 `bacde8d0ea2f8158016dc34a45294d4b1787834d`。/ PR #20 was merged into `main` with merge commit `bacde8d0ea2f8158016dc34a45294d4b1787834d`.
+- Issue #6 状态 / Issue #6 status：`DEVELOPING / 开发中`；由明确指定的 developer agent 在独立功能分支实施版本化订单 REST API 与 OpenAPI，通过 PR 交付，不自动合并。/ An explicitly assigned developer agent implements the versioned order REST API and OpenAPI on a feature branch for delivery by PR, with no automatic merge.
