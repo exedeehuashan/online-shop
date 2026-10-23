@@ -10,7 +10,8 @@
       "reportDirs": ["target/surefire-reports", "target/failsafe-reports"],
       "network": "egress",
       "dockerAccess": false,
-      "timeoutSeconds": 1800
+      "timeoutSeconds": 1800,
+      "selection": "maven-modules"
     },
     {
       "key": "backend-integration",
