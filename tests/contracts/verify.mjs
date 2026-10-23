@@ -1,4 +1,11 @@
 import fs from 'node:fs';
+import crypto from 'node:crypto';
+const manifest=JSON.parse(fs.readFileSync('tests/contracts/openapi-checksums.json','utf8'));
+for(const document of manifest.documents) {
+ const actual=crypto.createHash('sha256').update(fs.readFileSync(document.path)).digest('hex');
+ if(actual!==document.sha256) throw new Error(`OpenAPI checksum drift: ${document.path}`);
+ if(!document.source) throw new Error(`OpenAPI provenance missing: ${document.path}`);
+}
 const order=JSON.parse(fs.readFileSync('frontend/order-web/openapi/order-api.json','utf8'));
 const catalog=JSON.parse(fs.readFileSync('tests/contracts/catalog-api.json','utf8'));
 for (const [name,doc,path] of [['order',order,'/api/v1/customers/{customerId}/orders'],['catalog',catalog,'/api/v1/products']]) {

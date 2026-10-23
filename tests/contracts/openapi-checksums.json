@@ -1,0 +1,15 @@
+{
+  "baseline": "8a626c6aa5f9422762f4e2097162cf7f3eb4a354",
+  "documents": [
+    {
+      "path": "frontend/order-web/openapi/order-api.json",
+      "source": "GET /v3/api-docs from the pinned Order API; raw response bytes",
+      "sha256": "1d8f91bddbe6fdca9d3702c8aaba96747f69f793824f6da4985af11e971a43d3"
+    },
+    {
+      "path": "tests/contracts/catalog-api.json",
+      "source": "GET /v3/api-docs from the pinned Catalog API; raw response bytes",
+      "sha256": "aba4909e580cd8a90ba7deb671bd753278f31c090d08d4a8018e80fffc73e133"
+    }
+  ]
+}

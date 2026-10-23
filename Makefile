@@ -1,7 +1,10 @@
-.PHONY: test-unit test-integration test-contracts test-e2e test-uat test-performance compose-build compose-up compose-ready compose-logs compose-down compose-destroy
+.PHONY: test-unit test-foundation test-integration test-contracts test-e2e test-uat test-performance compose-build compose-up compose-ready compose-logs compose-down compose-destroy
 test-unit:
+	node scripts/check-foundation.mjs
 	mvn clean verify -DskipTests=false
 	cd frontend/order-web && npm ci && npm run api:check && npm run typecheck && npm run lint && npm test && npm run test:a11y && npm run build && npm audit --omit=dev --audit-level=high
+test-foundation:
+	node scripts/check-foundation.mjs
 test-integration:
 	./tests/integration/run.sh
 test-contracts:
