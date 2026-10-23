@@ -20,7 +20,7 @@ export function NewOrder() {
   const rotateKey=()=>{setKey(crypto.randomUUID());setServerError('');};
   const mutation=useMutation({
     mutationFn:()=>api.create(customerId,draft,key),retry:false,
-    onSuccess:async order=>{qc.setQueryData(orderKeys.detail(order.id),order);await qc.invalidateQueries({queryKey:orderKeys.list});await navigate({to:'/orders/$orderId',params:{orderId:order.id}});},
+    onSuccess:async order=>{qc.setQueryData(orderKeys.detail(order.id),order);await qc.invalidateQueries({queryKey:orderKeys.list});await navigate({to:'/account/orders/$orderId',params:{orderId:order.id}});},
     onError:error=>{setServerError(error instanceof ApiProblem&&error.status===422?`Order validation failed: ${error.message}`:`Could not create order: ${error.message}`);setTimeout(()=>summary.current?.focus());}
   });
   const merged=useMemo(()=>{try{return mergeItemsBySku(draft.items)}catch{return null}},[draft.items]);
