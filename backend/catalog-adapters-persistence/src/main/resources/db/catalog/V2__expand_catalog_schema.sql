@@ -213,6 +213,24 @@ CREATE UNIQUE INDEX uq_product_image_primary_product ON product_image (product_i
 CREATE UNIQUE INDEX uq_product_image_primary_sku ON product_image (product_sku_id) WHERE is_primary AND product_sku_id IS NOT NULL;
 CREATE INDEX idx_product_image_product_order ON product_image (product_id, display_order, id);
 
+CREATE FUNCTION demote_primary_images_before_product_sku_delete()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    UPDATE product_image
+       SET is_primary = false,
+           updated_at = statement_timestamp(),
+           version = version + 1
+     WHERE product_sku_id = OLD.id
+       AND is_primary;
+    RETURN OLD;
+END;
+$$;
+CREATE TRIGGER trg_product_sku_demote_primary_images
+BEFORE DELETE ON product_sku
+FOR EACH ROW EXECUTE FUNCTION demote_primary_images_before_product_sku_delete();
+
 CREATE TABLE catalog_legacy_migration_issue (
     legacy_product_id uuid NOT NULL,
     issue_code varchar(80) NOT NULL,
@@ -254,10 +272,26 @@ BEGIN
     IF EXISTS (SELECT 1 FROM catalog_legacy_migration_issue) THEN
         INSERT INTO catalog_legacy_reconciliation
             (id, status, legacy_count, product_count, sku_count, legacy_checksum, expanded_checksum, reconciled_at)
-        SELECT 1, 'NOT_READY', count(*), 0, 0,
-               md5(COALESCE(string_agg(concat_ws('|', id, name, description, price, currency, stock_quantity), E'\n' ORDER BY id), '')),
-               md5(''), statement_timestamp()
-          FROM products
+        WITH legacy AS (
+            SELECT count(*) AS row_count,
+                   -- JSON preserves field boundaries/nulls; UTF-8 hex makes row framing unambiguous.
+                   md5(COALESCE(string_agg(
+                       encode(convert_to(jsonb_build_array(id, name, description, price, currency, stock_quantity)::text, 'UTF8'), 'hex'),
+                       E'\n' ORDER BY id), '')) AS checksum
+              FROM products
+        ), expanded AS (
+            SELECT count(*) AS row_count,
+                   md5(COALESCE(string_agg(
+                       encode(convert_to(jsonb_build_array(p.legacy_id, p.name, p.description, s.price_amount, s.currency, s.available_quantity)::text, 'UTF8'), 'hex'),
+                       E'\n' ORDER BY p.legacy_id), '')) AS checksum
+              FROM product p JOIN product_sku s ON s.product_id = p.id AND s.is_default
+             WHERE p.legacy_id IS NOT NULL
+        ), sku AS (
+            SELECT count(*) AS row_count FROM product_sku
+        )
+        SELECT 1, 'NOT_READY', legacy.row_count, expanded.row_count, sku.row_count,
+               legacy.checksum, expanded.checksum, statement_timestamp()
+          FROM legacy CROSS JOIN expanded CROSS JOIN sku
         ON CONFLICT (id) DO UPDATE SET status = EXCLUDED.status, legacy_count = EXCLUDED.legacy_count,
             product_count = EXCLUDED.product_count, sku_count = EXCLUDED.sku_count,
             legacy_checksum = EXCLUDED.legacy_checksum, expanded_checksum = EXCLUDED.expanded_checksum,
@@ -290,19 +324,26 @@ BEGIN
         (id, status, legacy_count, product_count, sku_count, legacy_checksum, expanded_checksum, reconciled_at)
     WITH legacy AS (
         SELECT count(*) AS row_count,
-               md5(COALESCE(string_agg(concat_ws('|', id, name, description, price, currency, stock_quantity), E'\n' ORDER BY id), '')) AS checksum
+               -- Apply the identical canonical UTF-8 representation to both reconciliation sides.
+               md5(COALESCE(string_agg(
+                   encode(convert_to(jsonb_build_array(id, name, description, price, currency, stock_quantity)::text, 'UTF8'), 'hex'),
+                   E'\n' ORDER BY id), '')) AS checksum
           FROM products
     ), expanded AS (
         SELECT count(*) AS row_count,
-               md5(COALESCE(string_agg(concat_ws('|', p.legacy_id, p.name, p.description, s.price_amount, s.currency, s.available_quantity), E'\n' ORDER BY p.legacy_id), '')) AS checksum
+               md5(COALESCE(string_agg(
+                   encode(convert_to(jsonb_build_array(p.legacy_id, p.name, p.description, s.price_amount, s.currency, s.available_quantity)::text, 'UTF8'), 'hex'),
+                   E'\n' ORDER BY p.legacy_id), '')) AS checksum
           FROM product p JOIN product_sku s ON s.product_id = p.id AND s.is_default
          WHERE p.legacy_id IS NOT NULL
+    ), sku AS (
+        SELECT count(*) AS row_count FROM product_sku
     )
     SELECT 1,
            CASE WHEN legacy.row_count = expanded.row_count AND legacy.checksum = expanded.checksum THEN 'READY' ELSE 'MISMATCH' END,
-           legacy.row_count, expanded.row_count, expanded.row_count, legacy.checksum, expanded.checksum,
+           legacy.row_count, expanded.row_count, sku.row_count, legacy.checksum, expanded.checksum,
            statement_timestamp()
-      FROM legacy CROSS JOIN expanded
+      FROM legacy CROSS JOIN expanded CROSS JOIN sku
     ON CONFLICT (id) DO UPDATE SET status = EXCLUDED.status, legacy_count = EXCLUDED.legacy_count,
         product_count = EXCLUDED.product_count, sku_count = EXCLUDED.sku_count,
         legacy_checksum = EXCLUDED.legacy_checksum, expanded_checksum = EXCLUDED.expanded_checksum,

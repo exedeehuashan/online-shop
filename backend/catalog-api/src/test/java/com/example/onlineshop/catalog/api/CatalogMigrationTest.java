@@ -116,6 +116,33 @@ class CatalogMigrationTest {
     }
 
     @Test
+    void deletingSkuDemotesItsPrimaryImageBeforeMovingItToProductScope() throws Exception {
+        Database database = database("image_delete");
+        database.flyway().migrate();
+        Instant now = Instant.parse("2026-01-01T00:00:00Z");
+        UUID product = UUID.randomUUID();
+        UUID sku = UUID.randomUUID();
+        UUID productImage = UUID.randomUUID();
+        UUID skuImage = UUID.randomUUID();
+        database.execute("INSERT INTO product (id,slug,name,description,status,created_at,updated_at) VALUES "
+                + "('" + product + "','image-delete','Image delete','','ACTIVE','" + now + "','" + now + "')");
+        database.execute("INSERT INTO product_sku "
+                + "(id,product_id,sku,status,price_amount,currency,available_quantity,is_default,variant_signature,created_at,updated_at) VALUES "
+                + "('" + sku + "','" + product + "','IMAGE-DELETE','ACTIVE',1.00,'NZD',1,true,'default','" + now + "','" + now + "')");
+        database.execute("INSERT INTO product_image "
+                + "(id,product_id,product_sku_id,url,is_primary,created_at,updated_at) VALUES "
+                + "('" + productImage + "','" + product + "',NULL,'/product.png',true,'" + now + "','" + now + "'),"
+                + "('" + skuImage + "','" + product + "','" + sku + "','/sku.png',true,'" + now + "','" + now + "')");
+
+        database.execute("DELETE FROM product_sku WHERE id='" + sku + "'");
+
+        assertThat(database.queryLong("SELECT count(*) FROM product_image WHERE id='" + skuImage
+                + "' AND product_sku_id IS NULL AND NOT is_primary AND version=1")).isEqualTo(1);
+        assertThat(database.queryLong("SELECT count(*) FROM product_image WHERE id='" + productImage
+                + "' AND product_sku_id IS NULL AND is_primary")).isEqualTo(1);
+    }
+
+    @Test
     void exactBaselineUpgradeBackfillsInBatchesAndIsRestartable() throws Exception {
         Database database = database("upgrade");
         database.flyway("1").migrate();
@@ -167,6 +194,42 @@ class CatalogMigrationTest {
         database.execute("CALL catalog_preflight_and_backfill_legacy_products(1)");
         assertThat(database.queryLong("SELECT count(*) FROM catalog_legacy_migration_issue")).isZero();
         assertThat(database.queryString("SELECT status FROM catalog_legacy_reconciliation WHERE id=1")).isEqualTo("READY");
+    }
+
+    @Test
+    void reconciliationChecksumRejectsDelimiterShiftAndReportsAccurateMetadata() throws Exception {
+        Database database = database("reconciliation");
+        database.flyway("1").migrate();
+        UUID valid = UUID.fromString("40000000-0000-0000-0000-000000000004");
+        insertLegacy(database, valid, "Tea|Green", "Leaves", "12.30", "NZD", 4);
+        database.flyway().migrate();
+
+        database.execute("UPDATE product SET name='Tea', description='Green|Leaves' WHERE legacy_id='" + valid + "'");
+        database.execute("CALL catalog_preflight_and_backfill_legacy_products(1)");
+        assertThat(database.queryString("SELECT status FROM catalog_legacy_reconciliation WHERE id=1"))
+                .isEqualTo("MISMATCH");
+        assertThat(database.queryLong("SELECT (legacy_checksum <> expanded_checksum)::int "
+                + "FROM catalog_legacy_reconciliation WHERE id=1")).isEqualTo(1);
+
+        database.execute("UPDATE product SET name='Tea|Green', description='Leaves' WHERE legacy_id='" + valid + "'");
+        UUID extraSku = UUID.randomUUID();
+        database.execute("INSERT INTO product_sku "
+                + "(id,product_id,sku,status,price_amount,currency,available_quantity,is_default,variant_signature,created_at,updated_at) VALUES "
+                + "('" + extraSku + "','" + valid + "','EXTRA-SKU','ACTIVE',2.00,'NZD',2,false,'extra',"
+                + "'2026-01-01T00:00:00Z','2026-01-01T00:00:00Z')");
+        UUID invalid = UUID.fromString("50000000-0000-0000-0000-000000000005");
+        database.execute("INSERT INTO products (id,name,description,price,currency,stock_quantity,created_at,updated_at) VALUES "
+                + "('" + invalid + "','Invalid','Fixture',1.00,'NZD',1,'2026-01-02T00:00:00Z','2026-01-01T00:00:00Z')");
+        database.execute("CALL catalog_preflight_and_backfill_legacy_products(1)");
+
+        assertThat(database.queryString("SELECT status FROM catalog_legacy_reconciliation WHERE id=1"))
+                .isEqualTo("NOT_READY");
+        assertThat(database.queryLong("SELECT product_count FROM catalog_legacy_reconciliation WHERE id=1"))
+                .isEqualTo(1);
+        assertThat(database.queryLong("SELECT sku_count FROM catalog_legacy_reconciliation WHERE id=1"))
+                .isEqualTo(2);
+        assertThat(database.queryLong("SELECT (expanded_checksum <> md5(''))::int "
+                + "FROM catalog_legacy_reconciliation WHERE id=1")).isEqualTo(1);
     }
 
     private static void insertLegacy(Database database, UUID id, String name, String description,
