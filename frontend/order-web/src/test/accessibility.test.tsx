@@ -1,21 +1,19 @@
-import type {ReactNode} from 'react';
 import {QueryClient,QueryClientProvider} from '@tanstack/react-query';
-import {fireEvent,render} from '@testing-library/react';
+import {createMemoryHistory,RouterProvider} from '@tanstack/react-router';
+import {render} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import axeCore from 'axe-core';
-import {afterEach,expect,it,vi} from 'vitest';
-import {OrdersList} from '../routes/OrdersList';
-import {NewOrder} from '../routes/NewOrder';
-import {OrderDetail} from '../routes/OrderDetail';
+import {afterEach,beforeEach,expect,it,vi} from 'vitest';
+import {createAppRouter} from '../app/router';
 import {buildOrderPage} from '../features/orders/fixtures/orders';
-import pageHtml from '../../index.html?raw';
-import {AppShell,ForbiddenPage,NotFoundPage} from '../app/Shell';
 
-vi.mock('@tanstack/react-router',async importOriginal=>({...await importOriginal<typeof import('@tanstack/react-router')>(),Link:({to,params,children,className}:{to:string;params?:Record<string,string>;children:ReactNode;className?:string})=><a href={params?Object.entries(params).reduce((path,[key,value])=>path.replace(`$${key}`,value),to):to} className={className}>{children}</a>,useNavigate:()=>vi.fn(),useParams:()=>({orderId:'11111111-1111-1111-1111-111111111111'})}));
-const renderView=(component:ReactNode,options?:Parameters<typeof render>[1])=>render(<QueryClientProvider client={new QueryClient({defaultOptions:{queries:{retry:false}}})}>{component}</QueryClientProvider>,options);
+const response=(body:unknown)=>new Response(JSON.stringify(body),{headers:{'Content-Type':'application/json'}});
+const mount=async(path:string)=>{const router=createAppRouter(createMemoryHistory({initialEntries:[path]}));await router.load();return render(<QueryClientProvider client={new QueryClient({defaultOptions:{queries:{retry:false}}})}><RouterProvider router={router}/></QueryClientProvider>)};
+const expectDocumentAccessible=async()=>expect((await axeCore.run(document)).violations).toEqual([]);
 afterEach(()=>vi.unstubAllGlobals());
+beforeEach(()=>{document.documentElement.lang='en';document.title='Northstar market'});
 
-it('has no document-level accessibility violations in the primary list state',async()=>{document.open();document.write(pageHtml);document.close();vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify(buildOrderPage()),{headers:{'Content-Type':'application/json'}})));const root=document.getElementById('root');expect(root).not.toBeNull();const rendered=renderView(<OrdersList/>,{container:root!});await rendered.findByText('DRAFT');expect(document.compatMode).toBe('CSS1Compat');expect(document.title).toBe('Order desk');expect(document.documentElement.lang).toBe('en');expect(document.doctype?.name).toBe('html');expect((await axeCore.run(document)).violations).toEqual([]);});
-it('has no violations in create validation state',async()=>{const rendered=renderView(<NewOrder/>);await userEvent.click(rendered.getByRole('button',{name:'Submit order'}));expect((await axeCore.run(rendered.container)).violations).toEqual([]);});
-it('has no violations in detail and cancellation dialog states',async()=>{vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify(buildOrderPage().content[0]),{headers:{'Content-Type':'application/json'}})));const rendered=renderView(<OrderDetail/>);await rendered.findByText('Ada Lovelace');await userEvent.click(rendered.getByRole('button',{name:'Cancel order'}));fireEvent.change(rendered.getByLabelText('Reason'),{target:{value:'changed mind'}});expect((await axeCore.run(rendered.container)).violations).toEqual([]);});
-it('has no violations in shell system states',async()=>{for(const view of [<AppShell><ForbiddenPage/></AppShell>,<AppShell><NotFoundPage/></AppShell>]){const rendered=render(view);expect((await axeCore.run(rendered.container)).violations).toEqual([]);rendered.unmount();}});
+it.each(['/','/products','/forbidden','/offline','/not-a-route'])('has no document-level shell violations on %s',async path=>{await mount(path);await expectDocumentAccessible()});
+it('has no document-level violations in the primary list state',async()=>{vi.stubGlobal('fetch',vi.fn(async()=>response(buildOrderPage())));const rendered=await mount('/account/orders');await rendered.findByText('DRAFT');await expectDocumentAccessible()});
+it('has no document-level violations in create validation state',async()=>{const rendered=await mount('/checkout');await userEvent.click(await rendered.findByRole('button',{name:'Submit order'}));await expectDocumentAccessible()});
+it('has no document-level violations in detail and cancellation dialog states',async()=>{vi.stubGlobal('fetch',vi.fn(async()=>response(buildOrderPage().content[0])));const rendered=await mount('/account/orders/11111111-1111-1111-1111-111111111111');await rendered.findByText('Ada Lovelace');await userEvent.click(rendered.getByRole('button',{name:'Cancel order'}));await expectDocumentAccessible()});

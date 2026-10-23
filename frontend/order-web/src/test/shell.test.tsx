@@ -19,8 +19,8 @@ it('renders accessible commercial shell landmarks and skip link',async()=>{
 
 it.each([
   ['/orders','/account/orders'],
-  ['/orders/new?campaign=spring','/checkout?campaign=spring'],
-  ['/orders/11111111-1111-1111-1111-111111111111?from=email','/account/orders/11111111-1111-1111-1111-111111111111?from=email'],
+  ['/orders/new?campaign=spring#items','/checkout?campaign=spring#items'],
+  ['/orders/11111111-1111-1111-1111-111111111111?from=email#timeline','/account/orders/11111111-1111-1111-1111-111111111111?from=email#timeline'],
 ])('redirects legacy order path %s without losing deep-link intent',async(from,to)=>{
   const router=await mount(from);
   await waitFor(()=>expect(router.state.location.href).toBe(to));
