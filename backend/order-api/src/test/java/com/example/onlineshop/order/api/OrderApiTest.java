@@ -22,7 +22,7 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
 
 @SpringBootTest
 @AutoConfigureMockMvc
-@Testcontainers
+@Tag("docker") @Testcontainers
 class OrderApiTest {
   @Container static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer("postgres:16-alpine");
   @DynamicPropertySource static void database(DynamicPropertyRegistry properties) {

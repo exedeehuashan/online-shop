@@ -1,5 +1,6 @@
 package com.example.onlineshop.catalog.api;
 
+import org.junit.jupiter.api.Tag;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -17,7 +18,7 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 
-@Testcontainers(disabledWithoutDocker = false)
+@Tag("docker") @Testcontainers(disabledWithoutDocker = false)
 class CatalogMigrationTest {
     @Container
     static final PostgreSQLContainer postgres = new PostgreSQLContainer("postgres:16.6-alpine");
