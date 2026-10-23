@@ -1,0 +1,180 @@
+{
+  "schemaVersion": 1,
+  "collections": [
+    {
+      "key": "catalog-api-smoke",
+      "name": "Catalog API smoke",
+      "description": "UAT scenario #1 as executable API tests: create, read and list a synthetic product; invalid input is 422; an unknown id is 404.",
+      "service": "catalog-api",
+      "cases": [
+        {
+          "id": "TC-CAT-001",
+          "name": "Create, read and list a product",
+          "steps": [
+            {
+              "name": "create",
+              "request": {"method": "POST", "path": "/api/v1/products",
+                "json": {"name": "EAHP Synthetic Tea", "description": "EAHP API test fixture", "price": "12.30", "currency": "NZD", "stockQuantity": 7}},
+              "expect": {"status": 201, "headers": {"Location": {"matches": "/api/v1/products/[0-9a-f-]{36}"}},
+                "json": [{"path": "$.id", "matches": "[0-9a-f-]{36}"}, {"path": "$.price", "equals": "12.30"}, {"path": "$.currency", "equals": "NZD"},
+                  {"path": "$.stockQuantity", "equals": 7}], "maxMillis": 5000},
+              "capture": {"productId": "$.id"}
+            },
+            {
+              "name": "detail",
+              "request": {"method": "GET", "path": "/api/v1/products/{{productId}}"},
+              "expect": {"status": 200, "json": [{"path": "$.id", "equals": "{{productId}}"}, {"path": "$.price", "equals": "12.30"}, {"path": "$.name", "equals": "EAHP Synthetic Tea"}]}
+            },
+            {
+              "name": "list",
+              "request": {"method": "GET", "path": "/api/v1/products?page=0&size=20"},
+              "expect": {"status": 200, "json": [{"path": "$.content", "type": "array"}]}
+            }
+          ]
+        },
+        {
+          "id": "TC-CAT-002",
+          "name": "Invalid product is rejected with 422",
+          "steps": [
+            {
+              "request": {"method": "POST", "path": "/api/v1/products", "json": {}},
+              "expect": {"status": 422, "json": [{"path": "$.code", "equals": "INVALID_PRODUCT"}, {"path": "$.status", "equals": 422}]}
+            }
+          ]
+        },
+        {
+          "id": "TC-CAT-003",
+          "name": "Unknown product is 404",
+          "steps": [
+            {
+              "request": {"method": "GET", "path": "/api/v1/products/00000000-0000-0000-0000-000000000000"},
+              "expect": {"status": 404, "json": [{"path": "$.code", "equals": "PRODUCT_NOT_FOUND"}]}
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "order-api-smoke",
+      "name": "Order API smoke",
+      "description": "UAT scenarios #13-#16 as executable API tests: idempotent creation, retrieval, confirmation with optimistic locking, cancellation and invalid transitions.",
+      "service": "order-api",
+      "variables": {"customerId": "eahp-{{$runId}}-{{$uuid}}", "idempotencyKey": "eahp-{{$uuid}}"},
+      "cases": [
+        {
+          "id": "TC-ORD-001",
+          "name": "Create an order and replay the same idempotency key",
+          "steps": [
+            {
+              "name": "create",
+              "request": {"method": "POST", "path": "/api/v1/customers/{{customerId}}/orders", "headers": {"Idempotency-Key": "{{idempotencyKey}}"},
+                "json": {"customerName": "EAHP Synthetic", "items": [{"productId": "product-eahp", "sku": "SKU-EAHP", "name": "Fixture", "unitPrice": {"amount": 10.00, "currency": "NZD"}, "quantity": 2}],
+                  "shippingAddress": {"recipient": "EAHP Synthetic", "line1": "1 Test Street", "line2": "", "city": "Auckland", "region": "Auckland", "postalCode": "1010", "countryCode": "NZ", "phone": ""}}},
+              "expect": {"status": 201, "headers": {"Location": {"matches": "/api/v1/customers/.+/orders/[0-9a-f-]{36}"}},
+                "json": [{"path": "$.status", "equals": "DRAFT"}, {"path": "$.customerId", "equals": "{{customerId}}"}, {"path": "$.total.amount", "equals": "20.00"},
+                  {"path": "$.items[0].lineTotal.amount", "equals": "20.00"}, {"path": "$.version", "equals": 0}], "maxMillis": 5000},
+              "capture": {"orderId": "$.id"}
+            },
+            {
+              "name": "replay",
+              "request": {"method": "POST", "path": "/api/v1/customers/{{customerId}}/orders", "headers": {"Idempotency-Key": "{{idempotencyKey}}"},
+                "json": {"customerName": "EAHP Synthetic", "items": [{"productId": "product-eahp", "sku": "SKU-EAHP", "name": "Fixture", "unitPrice": {"amount": 10.00, "currency": "NZD"}, "quantity": 2}],
+                  "shippingAddress": {"recipient": "EAHP Synthetic", "line1": "1 Test Street", "line2": "", "city": "Auckland", "region": "Auckland", "postalCode": "1010", "countryCode": "NZ", "phone": ""}}},
+              "expect": {"status": 200, "json": [{"path": "$.id", "equals": "{{orderId}}"}, {"path": "$.status", "equals": "DRAFT"}]}
+            }
+          ]
+        },
+        {
+          "id": "TC-ORD-002",
+          "name": "Read an order and list the customer's orders newest first",
+          "steps": [
+            {
+              "name": "create",
+              "request": {"method": "POST", "path": "/api/v1/customers/{{customerId}}/orders", "headers": {"Idempotency-Key": "{{idempotencyKey}}"},
+                "json": {"customerName": "EAHP Synthetic", "items": [{"productId": "product-eahp", "sku": "SKU-EAHP", "name": "Fixture", "unitPrice": {"amount": 10.00, "currency": "NZD"}, "quantity": 1}],
+                  "shippingAddress": {"recipient": "EAHP Synthetic", "line1": "1 Test Street", "line2": "", "city": "Auckland", "region": "Auckland", "postalCode": "1010", "countryCode": "NZ", "phone": ""}}},
+              "expect": {"status": 201},
+              "capture": {"orderId": "$.id"}
+            },
+            {
+              "name": "detail",
+              "request": {"method": "GET", "path": "/api/v1/customers/{{customerId}}/orders/{{orderId}}"},
+              "expect": {"status": 200, "json": [{"path": "$.id", "equals": "{{orderId}}"}, {"path": "$.internalId", "exists": false}]}
+            },
+            {
+              "name": "list",
+              "request": {"method": "GET", "path": "/api/v1/customers/{{customerId}}/orders?page=0&size=20"},
+              "expect": {"status": 200, "json": [{"path": "$.content[0].id", "equals": "{{orderId}}"}, {"path": "$.content", "length": 1}]}
+            }
+          ]
+        },
+        {
+          "id": "TC-ORD-003",
+          "name": "Confirm with the matching version; a stale retry conflicts",
+          "steps": [
+            {
+              "name": "create",
+              "request": {"method": "POST", "path": "/api/v1/customers/{{customerId}}/orders", "headers": {"Idempotency-Key": "{{idempotencyKey}}"},
+                "json": {"customerName": "EAHP Synthetic", "items": [{"productId": "product-eahp", "sku": "SKU-EAHP", "name": "Fixture", "unitPrice": {"amount": 10.00, "currency": "NZD"}, "quantity": 1}],
+                  "shippingAddress": {"recipient": "EAHP Synthetic", "line1": "1 Test Street", "line2": "", "city": "Auckland", "region": "Auckland", "postalCode": "1010", "countryCode": "NZ", "phone": ""}}},
+              "expect": {"status": 201},
+              "capture": {"orderId": "$.id"}
+            },
+            {
+              "name": "confirm",
+              "request": {"method": "POST", "path": "/api/v1/customers/{{customerId}}/orders/{{orderId}}/confirmation", "headers": {"If-Match": "\"0\""}},
+              "expect": {"status": 200, "json": [{"path": "$.status", "equals": "CONFIRMED"}, {"path": "$.version", "equals": 1}]}
+            },
+            {
+              "name": "stale retry",
+              "request": {"method": "POST", "path": "/api/v1/customers/{{customerId}}/orders/{{orderId}}/confirmation", "headers": {"If-Match": "\"0\""}},
+              "expect": {"status": 409, "json": [{"path": "$.code", "equals": "OPTIMISTIC_LOCK_CONFLICT"}]}
+            }
+          ]
+        },
+        {
+          "id": "TC-ORD-004",
+          "name": "Cancel with a reason; confirming a cancelled order conflicts",
+          "steps": [
+            {
+              "name": "create",
+              "request": {"method": "POST", "path": "/api/v1/customers/{{customerId}}/orders", "headers": {"Idempotency-Key": "{{idempotencyKey}}"},
+                "json": {"customerName": "EAHP Synthetic", "items": [{"productId": "product-eahp", "sku": "SKU-EAHP", "name": "Fixture", "unitPrice": {"amount": 10.00, "currency": "NZD"}, "quantity": 1}],
+                  "shippingAddress": {"recipient": "EAHP Synthetic", "line1": "1 Test Street", "line2": "", "city": "Auckland", "region": "Auckland", "postalCode": "1010", "countryCode": "NZ", "phone": ""}}},
+              "expect": {"status": 201},
+              "capture": {"orderId": "$.id"}
+            },
+            {
+              "name": "cancel",
+              "request": {"method": "POST", "path": "/api/v1/customers/{{customerId}}/orders/{{orderId}}/cancellation", "headers": {"If-Match": "\"0\""},
+                "json": {"reason": "synthetic EAHP cancellation"}},
+              "expect": {"status": 200, "json": [{"path": "$.status", "equals": "CANCELLED"}, {"path": "$.cancellationReason", "equals": "synthetic EAHP cancellation"}]}
+            },
+            {
+              "name": "confirm cancelled",
+              "request": {"method": "POST", "path": "/api/v1/customers/{{customerId}}/orders/{{orderId}}/confirmation", "headers": {"If-Match": "\"1\""}},
+              "expect": {"status": 409}
+            }
+          ]
+        },
+        {
+          "id": "TC-ORD-005",
+          "name": "Invalid orders and missing preconditions are rejected",
+          "steps": [
+            {
+              "name": "invalid body",
+              "request": {"method": "POST", "path": "/api/v1/customers/{{customerId}}/orders", "headers": {"Idempotency-Key": "{{idempotencyKey}}"},
+                "json": {"customerName": "x", "items": [], "shippingAddress": {}}},
+              "expect": {"status": 422, "json": [{"path": "$.code", "equals": "INVALID_VALUE"}]}
+            },
+            {
+              "name": "confirm without If-Match",
+              "request": {"method": "POST", "path": "/api/v1/customers/{{customerId}}/orders/00000000-0000-0000-0000-000000000000/confirmation"},
+              "expect": {"status": 400}
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
