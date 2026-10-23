@@ -4,13 +4,15 @@
     {
       "key": "backend-unit",
       "name": "Backend unit and slice tests",
-      "description": "Every backend test that needs no Docker. Testcontainers tests are tagged docker and excluded here.",
+      "description": "Every backend test that needs no Docker. Testcontainers tests are tagged docker and excluded here. Line and branch coverage is collected with JaCoCo.",
       "image": "maven:3.9.11-eclipse-temurin-17",
       "command": [
         "mvn",
         "-B",
         "-ntp",
+        "org.jacoco:jacoco-maven-plugin:0.8.12:prepare-agent",
         "verify",
+        "org.jacoco:jacoco-maven-plugin:0.8.12:report",
         "-DskipTests=false",
         "-DexcludedGroups=docker"
       ],
@@ -21,7 +23,10 @@
       "network": "egress",
       "dockerAccess": false,
       "timeoutSeconds": 1800,
-      "selection": "maven-modules"
+      "selection": "maven-modules",
+      "coverage": [
+        "target/site/jacoco/jacoco.xml"
+      ]
     },
     {
       "key": "backend-integration",
