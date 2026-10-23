@@ -1,5 +1,13 @@
 # TASK-0021 Implementation Evidence
 
+## Issue #30 — catalog domain and frozen v1 remediation
+
+- Added persisted product/SKU typed-value assignments and product-category membership, including aggregate rehydration, plus approved attribute flags/validation/display order and category descriptions.
+- Added version-predicate product/SKU updates, domain conflict mapping, guarded DRAFT/ACTIVE/ARCHIVED transitions, aggregate SKU archive cascading, and application-layer lifecycle operations.
+- Added reconciliation-backed readiness health, consistent list totals, axis-only variant signatures with aggregate revalidation, archived-attribute rejection, and preserved whitespace semantics for frozen v1 names.
+- Committed PostgreSQL-backed acceptance tests cover assignment/category persistence, optimistic conflict and archive round-trip, transaction rollback, list totals, audit/no-cross-context-FK checks, readiness failure, golden v1 shape/name behavior, and legacy-backfill v1 equivalence. Domain tests cover lifecycle guards, archive cascading, archived attributes, and reassignment uniqueness.
+- No merge, deployment, production/UAT mutation, or external database operation was performed.
+
 ## Issue #29 — catalog expand schema and legacy backfill
 
 - **Branch:** `feat/issue-29-catalog-schema`
