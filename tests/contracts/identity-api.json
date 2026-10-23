@@ -1,0 +1,25 @@
+{
+  "openapi": "3.0.3",
+  "info": {"title": "Identity API", "version": "1.0.0"},
+  "components": {
+    "securitySchemes": {"oidcBearer": {"type": "http", "scheme": "bearer", "bearerFormat": "JWT"}},
+    "schemas": {
+      "Me": {"type": "object", "required": ["id", "displayName", "permissions"], "properties": {"id": {"type": "string", "format": "uuid"}, "displayName": {"type": "string"}, "permissions": {"type": "array", "uniqueItems": true, "items": {"type": "string", "pattern": "^[a-z][a-z0-9-]*:[a-z][a-z0-9-]*(?::[a-z][a-z0-9-]*)?$"}}}},
+      "RoleGrant": {"type": "object", "properties": {"expiresAt": {"type": "string", "format": "date-time", "nullable": true}}},
+      "Problem": {"type": "object", "required": ["type", "title", "status", "code"], "properties": {"type": {"type": "string", "format": "uri"}, "title": {"type": "string"}, "status": {"type": "integer"}, "code": {"type": "string"}}}
+    },
+    "responses": {
+      "Unauthorized": {"description": "Missing or invalid bearer token", "content": {"application/problem+json": {"schema": {"$ref": "#/components/schemas/Problem"}}}},
+      "Forbidden": {"description": "Inactive local principal or insufficient permission", "content": {"application/problem+json": {"schema": {"$ref": "#/components/schemas/Problem"}}}}
+    }
+  },
+  "security": [{"oidcBearer": []}],
+  "paths": {
+    "/api/v1/me": {"get": {"summary": "Current local principal and effective permissions", "responses": {"200": {"description": "Principal", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Me"}}}}, "401": {"$ref": "#/components/responses/Unauthorized"}, "403": {"$ref": "#/components/responses/Forbidden"}}}},
+    "/api/v1/admin/users": {"get": {"summary": "List application principals", "responses": {"200": {"description": "Users"}, "401": {"$ref": "#/components/responses/Unauthorized"}, "403": {"$ref": "#/components/responses/Forbidden"}}}},
+    "/api/v1/admin/roles": {"get": {"summary": "List roles", "responses": {"200": {"description": "Roles"}, "401": {"$ref": "#/components/responses/Unauthorized"}, "403": {"$ref": "#/components/responses/Forbidden"}}}},
+    "/api/v1/admin/permissions": {"get": {"summary": "List immutable permission definitions", "responses": {"200": {"description": "Permissions"}, "401": {"$ref": "#/components/responses/Unauthorized"}, "403": {"$ref": "#/components/responses/Forbidden"}}}},
+    "/api/v1/admin/users/{userId}/roles/{roleId}": {"parameters": [{"in": "path", "name": "userId", "required": true, "schema": {"type": "string", "format": "uuid"}}, {"in": "path", "name": "roleId", "required": true, "schema": {"type": "string", "format": "uuid"}}], "put": {"summary": "Grant a role", "requestBody": {"content": {"application/json": {"schema": {"$ref": "#/components/schemas/RoleGrant"}}}}, "responses": {"204": {"description": "Granted"}, "401": {"$ref": "#/components/responses/Unauthorized"}, "403": {"$ref": "#/components/responses/Forbidden"}}}, "delete": {"summary": "Revoke a role", "responses": {"204": {"description": "Revoked"}, "401": {"$ref": "#/components/responses/Unauthorized"}, "403": {"$ref": "#/components/responses/Forbidden"}}}},
+    "/api/v1/admin/roles/{roleId}/permissions/{permissionId}": {"parameters": [{"in": "path", "name": "roleId", "required": true, "schema": {"type": "string", "format": "uuid"}}, {"in": "path", "name": "permissionId", "required": true, "schema": {"type": "string", "format": "uuid"}}], "put": {"summary": "Grant a permission", "responses": {"204": {"description": "Granted"}, "401": {"$ref": "#/components/responses/Unauthorized"}, "403": {"$ref": "#/components/responses/Forbidden"}}}, "delete": {"summary": "Revoke a permission", "responses": {"204": {"description": "Revoked"}, "401": {"$ref": "#/components/responses/Unauthorized"}, "403": {"$ref": "#/components/responses/Forbidden"}}}}
+  }
+}

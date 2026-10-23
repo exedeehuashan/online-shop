@@ -10,6 +10,14 @@ spring:
       validation-timeout: 2000
   flyway:
     locations: classpath:db/catalog
+catalog:
+  security:
+    enabled: ${CATALOG_SECURITY_ENABLED:false}
+    issuer: ${CATALOG_OIDC_ISSUER:}
+    audience: ${CATALOG_OIDC_AUDIENCE:}
+    jwk-set-uri: ${CATALOG_OIDC_JWKS_URI:}
+    algorithm: ${CATALOG_OIDC_ALGORITHM:RS256}
+    identity-base-url: ${IDENTITY_INTERNAL_URL:}
   jpa:
     open-in-view: false
     hibernate:

@@ -65,3 +65,17 @@
 - Pull request: https://github.com/exedeehuashan/online-shop/pull/48 (`Closes #33`)
 - Target: `main`
 - Merge, deployment, public exposure, and production/UAT mutation were not performed.
+
+## Issue #34 — external OIDC/JWT enforcement and RBAC administration
+
+- **Branch:** `feat/issue-34-oidc-rbac`
+- **Baseline:** `39a6a0b` (merged Issues #27, #28, and #33)
+- Added feature-flagged OAuth resource-server enforcement with required issuer, audience, validity-time, asymmetric algorithm, signature, and JWKS validation. Missing/invalid tokens are 401; valid external identities without one active local `(issuer, subject)` principal and exact permission failures are 403.
+- Added bounded (default 30 seconds, maximum 5 minutes) effective-permission caching with immediate invalidation for role and permission changes; wildcard, inheritance, and explicit-deny behavior are absent.
+- Added `/api/v1/me`, read-only administrative user/role/permission views, and audited role/permission grant and revocation routes protected by exact `rbac:manage` authority. Responses do not expose bearer or refresh tokens.
+- Added correlation propagation and deterministic UUID audit correlation mapping, preserving accepted caller correlation identifiers on responses.
+- Added feature-flagged catalog mutation protection. Catalog validates the same strict JWT boundary and obtains locally effective application permissions from the internal identity `/me` endpoint before allowing `catalog:write` operations. Existing public catalog reads remain available. The nginx public proxy was not changed and contains no identity route.
+- Checked in the Identity OpenAPI contract and checksum/provenance validation.
+- Added security/API tests covering 401/403 separation, malformed tokens, inactive local identities, exact-permission denial, safe `/me`, mutation audit context, cache TTL and invalidation, and unsafe OIDC/cache configuration rejection.
+- No IdP was selected, no credential storage was introduced, and no UAT/production enablement, deployment, public exposure, or production mutation was performed.
+- Developer verification: focused catalog/identity reactor **PASS**; full reactor verification **PASS** (13 modules, 86 tests, 0 failures/errors/skips); contracts/API drift **PASS**; foundation checks and `git diff --check` **PASS**. Contract verification reported the pre-existing frontend dependency audit state of one low-severity advisory.

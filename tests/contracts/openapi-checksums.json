@@ -10,6 +10,11 @@
       "path": "tests/contracts/catalog-api.json",
       "source": "GET /v3/api-docs from the pinned Catalog API; raw response bytes",
       "sha256": "aba4909e580cd8a90ba7deb671bd753278f31c090d08d4a8018e80fffc73e133"
+    },
+    {
+      "path": "tests/contracts/identity-api.json",
+      "source": "Issue #34 approved checked-in Identity API contract at baseline 39a6a0b",
+      "sha256": "ab36217b6a6cda66b602f7637c43243a344ca009c8f7616e471b004c5f49a678"
     }
   ]
 }

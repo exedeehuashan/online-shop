@@ -1,2 +1,2 @@
-/** Non-web identity bootstrap runtime; OIDC and HTTP administration remain deferred to Issue 34. */
+/** OIDC resource server and deny-by-default local RBAC administration boundary. */
 package com.example.onlineshop.identity.api;

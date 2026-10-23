@@ -10,6 +10,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
+import com.example.onlineshop.identity.persistence.JdbcRbacAssignments;
 
 @SpringBootApplication(scanBasePackages = "com.example.onlineshop.identity")
 public class IdentityApiApplication {
@@ -17,6 +18,10 @@ public class IdentityApiApplication {
 
   @Bean IdentityBootstrap identityBootstrap(JdbcTemplate jdbc, PlatformTransactionManager transactions) {
     return new JdbcIdentityBootstrap(jdbc, new TransactionTemplate(transactions));
+  }
+
+  @Bean JdbcRbacAssignments rbacAssignments(JdbcTemplate jdbc, PlatformTransactionManager transactions) {
+    return new JdbcRbacAssignments(jdbc, new TransactionTemplate(transactions));
   }
 
   @Bean ApplicationRunner configuredBootstrap(

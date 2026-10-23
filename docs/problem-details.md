@@ -36,3 +36,9 @@ The HTTP method is not supported by the target resource.
 
 ## unsupported-media-type
 The request content type is not supported.
+
+# Identity security
+
+- `AUTHENTICATION_REQUIRED` (401): bearer credentials are missing, malformed, expired, or fail issuer, audience, signature, time, or algorithm validation.
+- `LOCAL_PRINCIPAL_DENIED` (403): the externally authenticated issuer/subject does not map to one active application principal.
+- `ACCESS_DENIED` (403): the active application principal lacks the exact required permission.

@@ -1,6 +1,5 @@
 spring:
   application.name: identity-api
-  main.web-application-type: none
   datasource:
     url: ${IDENTITY_DB_URL:jdbc:postgresql://localhost:5432/identity}
     username: ${IDENTITY_DB_USER:identity_app}
@@ -8,6 +7,13 @@ spring:
   flyway:
     locations: classpath:db/identity
 identity:
+  security:
+    enabled: ${IDENTITY_SECURITY_ENABLED:false}
+    issuer: ${IDENTITY_OIDC_ISSUER:}
+    audience: ${IDENTITY_OIDC_AUDIENCE:}
+    jwk-set-uri: ${IDENTITY_OIDC_JWKS_URI:}
+    algorithm: ${IDENTITY_OIDC_ALGORITHM:RS256}
+    permission-cache-ttl: ${IDENTITY_PERMISSION_CACHE_TTL:PT30S}
   bootstrap:
     enabled: ${IDENTITY_BOOTSTRAP_ENABLED:false}
     issuer: ${IDENTITY_BOOTSTRAP_ISSUER:}
