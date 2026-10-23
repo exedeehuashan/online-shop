@@ -5,6 +5,7 @@ Modular Java 17/Spring Boot Order and Catalog APIs with a React Order UI. Catalo
 ## Verify
 
 - `make test-unit`: backend clean verify plus frontend drift/type/lint/unit/accessibility/build/audit gates.
+- `make test-foundation`: ADR, convention, module-boundary, and checked-in OpenAPI provenance/drift gates.
 - `make test-integration`, `make test-contracts`, `make test-e2e`, `make test-uat`, `make test-performance`: dedicated suites; see each `tests/*/README.md`.
 
 ## Local UAT (not safe for public exposure)

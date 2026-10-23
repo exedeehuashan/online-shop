@@ -16,6 +16,10 @@
     <module>backend/catalog-application</module>
     <module>backend/catalog-adapters-persistence</module>
     <module>backend/catalog-api</module>
+    <module>backend/identity-domain</module>
+    <module>backend/identity-application</module>
+    <module>backend/identity-adapters-persistence</module>
+    <module>backend/identity-api</module>
   </modules>
   <properties>
     <maven.compiler.release>17</maven.compiler.release>
