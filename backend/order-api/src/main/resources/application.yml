@@ -4,6 +4,10 @@ spring:
   flyway:
     enabled: true
     locations: classpath:db/migration
+  datasource:
+    hikari:
+      connection-timeout: 3000
+      validation-timeout: 2000
   jackson:
     deserialization:
       fail-on-unknown-properties: true
@@ -19,3 +23,6 @@ management:
     health:
       probes:
         enabled: true
+      group:
+        readiness:
+          include: readinessState,db

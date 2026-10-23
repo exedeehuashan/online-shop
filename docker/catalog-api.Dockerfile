@@ -9,5 +9,5 @@ WORKDIR /app
 COPY --from=build /src/backend/catalog-api/target/catalog-api-*.jar app.jar
 USER 10001:10001
 EXPOSE 8080
-HEALTHCHECK --interval=10s --timeout=3s --retries=12 CMD curl -fsS http://127.0.0.1:8080/actuator/health/readiness || exit 1
+HEALTHCHECK --interval=5s --timeout=5s --retries=3 CMD curl -fsS http://127.0.0.1:8080/actuator/health/readiness || exit 1
 ENTRYPOINT ["java","-jar","/app/app.jar"]
