@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "suites": [
+    {
+      "key": "backend-unit",
+      "name": "Backend unit and slice tests",
+      "description": "Every backend test that needs no Docker. Testcontainers tests are tagged docker and excluded here.",
+      "image": "maven:3.9.11-eclipse-temurin-17",
+      "command": ["mvn", "-B", "-ntp", "verify", "-DskipTests=false", "-DexcludedGroups=docker"],
+      "reportDirs": ["target/surefire-reports", "target/failsafe-reports"],
+      "network": "egress",
+      "dockerAccess": false,
+      "timeoutSeconds": 1800
+    },
+    {
+      "key": "backend-integration",
+      "name": "Backend PostgreSQL integration tests",
+      "description": "Every test tagged docker (Testcontainers PostgreSQL) in all modules, including identity and catalog migrations.",
+      "image": "maven:3.9.11-eclipse-temurin-17",
+      "command": ["mvn", "-B", "-ntp", "verify", "-Dgroups=docker", "-Dsurefire.failIfNoSpecifiedTests=false"],
+      "reportDirs": ["target/surefire-reports", "target/failsafe-reports"],
+      "network": "egress",
+      "dockerAccess": true,
+      "timeoutSeconds": 2400
+    }
+  ]
+}

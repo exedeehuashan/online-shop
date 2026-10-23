@@ -1,5 +1,6 @@
 package com.example.onlineshop.order.persistence;
 
+import org.junit.jupiter.api.Tag;
 import static org.assertj.core.api.Assertions.*;
 
 import com.example.onlineshop.order.application.*;
@@ -22,7 +23,7 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
-@Testcontainers
+@Tag("docker") @Testcontainers
 class PostgresPersistenceTest {
   @Container static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer("postgres:16-alpine");
   static DataSource dataSource;

@@ -11,7 +11,8 @@ jobs:
         with: {distribution: temurin, java-version: '17', cache: maven}
       - uses: actions/setup-node@v4
         with: {node-version: '22', cache: npm, cache-dependency-path: frontend/order-web/package-lock.json}
-      - run: mvn -B verify -DskipTests=false -Dtest='!CatalogApiTest,!PostgresPersistenceTest,!OrderApiTest' -Dsurefire.failIfNoSpecifiedTests=false
+      # Docker-dependent tests are tagged "docker" and run in the integration suite; this job must not need Docker.
+      - run: mvn -B verify -DskipTests=false -DexcludedGroups=docker
       - run: npm ci
         working-directory: frontend/order-web
       - run: npm run api:check && npm run typecheck && npm run lint && npm test && npm run test:a11y && npm run build && npm audit --omit=dev --audit-level=high
