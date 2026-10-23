@@ -1,0 +1,16 @@
+spring:
+  application.name: identity-api
+  main.web-application-type: none
+  datasource:
+    url: ${IDENTITY_DB_URL:jdbc:postgresql://localhost:5432/identity}
+    username: ${IDENTITY_DB_USER:identity_app}
+    password: ${IDENTITY_DB_PASSWORD:identity_dev_only}
+  flyway:
+    locations: classpath:db/identity
+identity:
+  bootstrap:
+    enabled: ${IDENTITY_BOOTSTRAP_ENABLED:false}
+    issuer: ${IDENTITY_BOOTSTRAP_ISSUER:}
+    subject: ${IDENTITY_BOOTSTRAP_SUBJECT:}
+    permissions: ${IDENTITY_BOOTSTRAP_PERMISSIONS:catalog:read,catalog:write,order:read:self,order:read:any,order:manage,rbac:manage}
+  synthetic-seed.enabled: ${IDENTITY_SYNTHETIC_SEED_ENABLED:false}

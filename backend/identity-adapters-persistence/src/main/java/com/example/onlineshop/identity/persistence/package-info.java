@@ -1,2 +1,2 @@
-/** Persistence adapter placeholder. No schema or runtime adapter is introduced by Issue 27. */
+/** JDBC persistence, transactional RBAC assignment, and explicit identity bootstrap adapters. */
 package com.example.onlineshop.identity.persistence;
