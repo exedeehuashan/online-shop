@@ -36,6 +36,29 @@
 - Frontend regression: API drift check, typecheck, lint, 26 unit tests, 3 accessibility tests, production build, and high-severity production dependency audit — **PASS** (0 production vulnerabilities at the configured threshold; npm reported one low-severity advisory during install).
 - CI path coverage now includes `backend/identity-*/**` in the PostgreSQL integration workflow. Remote CI results will be verified against the pushed candidate SHA before handoff.
 
+### Independent QA remediation
+
+- Added identity migration V3 with explicit `principal_id`, `role_id`, and `permission_id` audit
+  fields, a database check constraint for authorization-event completeness, and lookup indexes.
+  `ROLE_GRANTED`/`ROLE_REVOKED` now always capture principal and role;
+  `PERMISSION_GRANTED`/`PERMISSION_REVOKED` always capture role and permission. Persistence tests
+  assert reconstructability for all four actions.
+- Serialized bootstrap reconciliation with a transaction-scoped PostgreSQL advisory lock. User and
+  system-role creation now use conflict-neutral inserts followed by locked reads and exact invariant
+  validation, without exception swallowing. Simultaneous fresh starts converge for both the same
+  subject and different subjects.
+- Bootstrap now fails closed when an existing principal is disabled. Audit reasons distinguish
+  `BOOTSTRAP_CREATED`, `BOOTSTRAP_RECONCILED`, and `IDEMPOTENT_BOOTSTRAP`.
+- The append-only audit trigger continues to reject application `UPDATE` and `DELETE`. `TRUNCATE`
+  remains an owner-level operational action used only for disposable test cleanup; blocking it in
+  the application schema would not protect against the table owner disabling or dropping the
+  trigger and would impair isolated integration-test reset. No production access or deployment was
+  performed.
+- Remediation verification: focused identity suite **PASS** (13 tests); full Maven reactor **PASS**
+  (77 tests); contracts **PASS**; PostgreSQL integration **PASS** (64 tests); foundation checks
+  **PASS**; frontend typecheck, lint, 26 unit tests, 3 accessibility tests, production build, and
+  high-severity production dependency audit **PASS** (0 vulnerabilities at the configured level).
+
 ### Pull request handoff
 
 - Implementation commit: `a057218aaf48656b8acd0031590e62ccd26f3077`

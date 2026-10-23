@@ -19,7 +19,7 @@ public final class JdbcRbacAssignments {
           insert into sys_user_role(user_id,role_id,granted_at,granted_by,expires_at)
           values (?,?,current_timestamp,?,?) on conflict (user_id,role_id) do nothing
           """, userId, roleId, actorId, expiresAt == null ? null : java.sql.Timestamp.from(expiresAt));
-      audit(actorId, "sys_user_role", userId, "ROLE_GRANTED", correlationId,
+      audit(actorId, "sys_user_role", userId, userId, roleId, null, "ROLE_GRANTED", correlationId,
           changed == 1 ? "GRANTED" : "ALREADY_GRANTED");
     });
   }
@@ -30,7 +30,7 @@ public final class JdbcRbacAssignments {
       lock("sys_user", userId);
       lock("sys_role", roleId);
       int changed = jdbc.update("delete from sys_user_role where user_id=? and role_id=?", userId, roleId);
-      audit(actorId, "sys_user_role", userId, "ROLE_REVOKED", correlationId,
+      audit(actorId, "sys_user_role", userId, userId, roleId, null, "ROLE_REVOKED", correlationId,
           changed == 1 ? "REVOKED" : "NOT_ASSIGNED");
     });
   }
@@ -49,7 +49,7 @@ public final class JdbcRbacAssignments {
           insert into sys_role_permission(role_id,permission_id,granted_at,granted_by)
           values (?,?,current_timestamp,?) on conflict (role_id,permission_id) do nothing
           """, roleId, permissionId, actorId);
-      audit(actorId, "sys_role_permission", roleId, "PERMISSION_GRANTED", correlationId,
+      audit(actorId, "sys_role_permission", roleId, null, roleId, permissionId, "PERMISSION_GRANTED", correlationId,
           changed == 1 ? "GRANTED" : "ALREADY_GRANTED");
     });
   }
@@ -60,16 +60,20 @@ public final class JdbcRbacAssignments {
       lock("sys_role", roleId);
       lock("sys_permission", permissionId);
       int changed = jdbc.update("delete from sys_role_permission where role_id=? and permission_id=?", roleId, permissionId);
-      audit(actorId, "sys_role_permission", roleId, "PERMISSION_REVOKED", correlationId,
+      audit(actorId, "sys_role_permission", roleId, null, roleId, permissionId, "PERMISSION_REVOKED", correlationId,
           changed == 1 ? "REVOKED" : "NOT_ASSIGNED");
     });
   }
 
-  private void audit(UUID actor, String targetType, UUID target, String action, UUID correlation, String reason) {
+  private void audit(UUID actor, String targetType, UUID target, UUID principal, UUID role,
+      UUID permission, String action, UUID correlation, String reason) {
     jdbc.update("""
-        insert into security_audit_event(id,actor_id,actor_label,target_type,target_id,action,occurred_at,correlation_id,outcome,reason_code)
-        values (?,?, 'application-user',?,?,?,current_timestamp,?,'SUCCEEDED',?)
-        """, UUID.randomUUID(), actor, targetType, target, action, correlation, reason);
+        insert into security_audit_event(
+          id,actor_id,actor_label,target_type,target_id,principal_id,role_id,permission_id,
+          action,occurred_at,correlation_id,outcome,reason_code)
+        values (?,?, 'application-user',?,?,?,?,?,?,current_timestamp,?,'SUCCEEDED',?)
+        """, UUID.randomUUID(), actor, targetType, target, principal, role, permission,
+        action, correlation, reason);
   }
 
   private void lock(String table, UUID id) {

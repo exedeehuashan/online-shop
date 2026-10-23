@@ -100,6 +100,20 @@ class IdentityPersistenceTest {
         .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("missing permission codes");
   }
 
+  @Test void bootstrapRejectsDisabledExistingPrincipalWithoutWritingAuthorizationState() {
+    UUID existingId = UUID.randomUUID();
+    jdbc.update("""
+        insert into sys_user(id,issuer,subject,display_name,status,created_at,updated_at)
+        values (?, 'https://id.example', 'admin-1', 'Disabled administrator', 'DISABLED', current_timestamp, current_timestamp)
+        """, existingId);
+
+    assertThatThrownBy(() -> bootstrap.bootstrap("https://id.example", "admin-1", allPermissions()))
+        .isInstanceOf(IllegalStateException.class).hasMessageContaining("must be ACTIVE");
+    assertThat(jdbc.queryForObject("select count(*) from sys_role", Integer.class)).isZero();
+    assertThat(jdbc.queryForObject("select count(*) from sys_user_role", Integer.class)).isZero();
+    assertThat(jdbc.queryForObject("select count(*) from security_audit_event", Integer.class)).isZero();
+  }
+
   @Test void effectivePermissionViewExcludesDisabledArchivedAndExpiredGrants() {
     bootstrap.bootstrap("https://id.example", "admin-1", allPermissions());
     UUID user = jdbc.queryForObject("select id from sys_user", UUID.class);
@@ -118,15 +132,59 @@ class IdentityPersistenceTest {
     assertThat(assignments.effectivePermissions(user)).isEmpty();
   }
 
-  @Test void authorizationChangesAppendImmutableAuditEvents() {
+  @Test void authorizationChangesCaptureBothAssignmentSidesAndAppendImmutableAuditEvents() {
     bootstrap.bootstrap("https://id.example", "admin-1", allPermissions());
     UUID user = jdbc.queryForObject("select id from sys_user", UUID.class);
-    assignments.revokeRole(user, JdbcIdentityBootstrap.ACCESS_ADMIN_ROLE, user, UUID.randomUUID());
-    assignments.grantRole(user, JdbcIdentityBootstrap.ACCESS_ADMIN_ROLE, user, null, UUID.randomUUID());
+    UUID roleRevokeCorrelation = UUID.randomUUID();
+    UUID roleGrantCorrelation = UUID.randomUUID();
+    UUID permissionRevokeCorrelation = UUID.randomUUID();
+    UUID permissionGrantCorrelation = UUID.randomUUID();
+    UUID permission = jdbc.queryForObject(
+        "select id from sys_permission where code='rbac:manage'", UUID.class);
+    assignments.revokeRole(user, JdbcIdentityBootstrap.ACCESS_ADMIN_ROLE, user, roleRevokeCorrelation);
+    assignments.grantRole(user, JdbcIdentityBootstrap.ACCESS_ADMIN_ROLE, user, null, roleGrantCorrelation);
+    assignments.revokePermission(JdbcIdentityBootstrap.ACCESS_ADMIN_ROLE, permission, user, permissionRevokeCorrelation);
+    assignments.grantPermission(JdbcIdentityBootstrap.ACCESS_ADMIN_ROLE, permission, user, permissionGrantCorrelation);
     assertThat(jdbc.queryForList("select action from security_audit_event order by occurred_at", String.class))
-        .contains("ROLE_REVOKED", "ROLE_GRANTED");
+        .contains("ROLE_REVOKED", "ROLE_GRANTED", "PERMISSION_REVOKED", "PERMISSION_GRANTED");
+    for (UUID correlation : List.of(roleRevokeCorrelation, roleGrantCorrelation)) {
+      assertThat(jdbc.queryForMap("""
+          select principal_id,role_id,permission_id from security_audit_event where correlation_id=?
+          """, correlation)).containsEntry("principal_id", user)
+          .containsEntry("role_id", JdbcIdentityBootstrap.ACCESS_ADMIN_ROLE)
+          .containsEntry("permission_id", null);
+    }
+    for (UUID correlation : List.of(permissionRevokeCorrelation, permissionGrantCorrelation)) {
+      assertThat(jdbc.queryForMap("""
+          select principal_id,role_id,permission_id from security_audit_event where correlation_id=?
+          """, correlation)).containsEntry("principal_id", null)
+          .containsEntry("role_id", JdbcIdentityBootstrap.ACCESS_ADMIN_ROLE)
+          .containsEntry("permission_id", permission);
+    }
     assertThatThrownBy(() -> jdbc.update("delete from security_audit_event"))
         .hasMessageContaining("security audit events are immutable");
+  }
+
+  @Test void simultaneousColdStartBootstrapConvergesForSameSubject() throws Exception {
+    runConcurrentBootstrap("admin-1", "admin-1");
+    assertThat(jdbc.queryForObject("select count(*) from sys_user", Integer.class)).isOne();
+    assertThat(jdbc.queryForObject("select count(*) from sys_role", Integer.class)).isEqualTo(4);
+    assertThat(jdbc.queryForObject("select count(*) from sys_role_permission", Integer.class)).isEqualTo(7);
+    assertThat(jdbc.queryForObject("select count(*) from sys_user_role", Integer.class)).isOne();
+    assertThat(jdbc.queryForList(
+        "select reason_code from security_audit_event order by occurred_at", String.class))
+        .containsExactlyInAnyOrder("BOOTSTRAP_CREATED", "IDEMPOTENT_BOOTSTRAP");
+  }
+
+  @Test void simultaneousColdStartBootstrapConvergesForDifferentSubjects() throws Exception {
+    runConcurrentBootstrap("admin-1", "admin-2");
+    assertThat(jdbc.queryForObject("select count(*) from sys_user", Integer.class)).isEqualTo(2);
+    assertThat(jdbc.queryForObject("select count(*) from sys_role", Integer.class)).isEqualTo(4);
+    assertThat(jdbc.queryForObject("select count(*) from sys_role_permission", Integer.class)).isEqualTo(7);
+    assertThat(jdbc.queryForObject("select count(*) from sys_user_role", Integer.class)).isEqualTo(2);
+    assertThat(jdbc.queryForList(
+        "select reason_code from security_audit_event order by occurred_at", String.class))
+        .containsOnly("BOOTSTRAP_CREATED");
   }
 
   @Test void concurrentDuplicateRoleGrantsConvergeToOneAssignmentAndAuditBothOutcomes() throws Exception {
@@ -153,5 +211,31 @@ class IdentityPersistenceTest {
 
   private static Set<String> allPermissions() {
     return Set.of("catalog:read", "catalog:write", "order:read:self", "order:read:any", "order:manage", "rbac:manage");
+  }
+
+  private static void runConcurrentBootstrap(String firstSubject, String secondSubject) throws Exception {
+    ExecutorService pool = Executors.newFixedThreadPool(2);
+    CyclicBarrier barrier = new CyclicBarrier(2);
+    try {
+      Callable<Void> first = bootstrapCall(barrier, firstSubject);
+      Callable<Void> second = bootstrapCall(barrier, secondSubject);
+      Future<Void> firstResult = pool.submit(first);
+      Future<Void> secondResult = pool.submit(second);
+      firstResult.get(15, TimeUnit.SECONDS);
+      secondResult.get(15, TimeUnit.SECONDS);
+    } finally {
+      pool.shutdownNow();
+    }
+  }
+
+  private static Callable<Void> bootstrapCall(CyclicBarrier barrier, String subject) {
+    return () -> {
+      barrier.await(5, TimeUnit.SECONDS);
+      JdbcTemplate threadJdbc = new JdbcTemplate(dataSource);
+      new JdbcIdentityBootstrap(threadJdbc,
+          new TransactionTemplate(new DataSourceTransactionManager(dataSource)))
+          .bootstrap("https://id.example", subject, allPermissions());
+      return null;
+    };
   }
 }
