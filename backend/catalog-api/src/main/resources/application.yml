@@ -1,0 +1,25 @@
+spring:
+  application:
+    name: catalog-api
+  datasource:
+    url: ${CATALOG_DB_URL:jdbc:postgresql://localhost:5432/catalog}
+    username: ${CATALOG_DB_USER:catalog_app}
+    password: ${CATALOG_DB_PASSWORD:catalog_dev_only}
+    hikari:
+      connection-timeout: 3000
+      validation-timeout: 2000
+  flyway:
+    locations: classpath:db/catalog
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+  jackson:
+    deserialization:
+      fail-on-unknown-properties: true
+management:
+  endpoints.web.exposure.include: health
+  endpoint:
+    health:
+      probes.enabled: true
+      group.readiness.include: readinessState,db

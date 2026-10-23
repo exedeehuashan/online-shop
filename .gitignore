@@ -1,7 +1,9 @@
 target/
 .idea/
 *.iml
-compose.yaml
+.env
+tests/**/reports/
+tests/**/results/
 frontend/order-web/node_modules/
 frontend/order-web/dist/
 frontend/order-web/playwright-report/
