@@ -2,5 +2,15 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0"><modelVersion>4.0.0</modelVersion>
   <parent><groupId>com.example.onlineshop</groupId><artifactId>online-shop</artifactId><version>0.1.0-SNAPSHOT</version><relativePath>../..</relativePath></parent>
   <artifactId>identity-adapters-persistence</artifactId>
-  <dependencies><dependency><groupId>com.example.onlineshop</groupId><artifactId>identity-application</artifactId><version>${project.version}</version></dependency></dependencies>
+  <dependencies>
+    <dependency><groupId>com.example.onlineshop</groupId><artifactId>identity-application</artifactId><version>${project.version}</version></dependency>
+    <dependency><groupId>org.springframework</groupId><artifactId>spring-jdbc</artifactId></dependency>
+    <dependency><groupId>org.flywaydb</groupId><artifactId>flyway-core</artifactId></dependency>
+    <dependency><groupId>org.flywaydb</groupId><artifactId>flyway-database-postgresql</artifactId></dependency>
+    <dependency><groupId>org.postgresql</groupId><artifactId>postgresql</artifactId></dependency>
+    <dependency><groupId>org.junit.jupiter</groupId><artifactId>junit-jupiter</artifactId><scope>test</scope></dependency>
+    <dependency><groupId>org.assertj</groupId><artifactId>assertj-core</artifactId><version>${assertj.version}</version><scope>test</scope></dependency>
+    <dependency><groupId>org.testcontainers</groupId><artifactId>testcontainers-postgresql</artifactId><scope>test</scope></dependency>
+    <dependency><groupId>org.testcontainers</groupId><artifactId>testcontainers-junit-jupiter</artifactId><scope>test</scope></dependency>
+  </dependencies>
 </project>

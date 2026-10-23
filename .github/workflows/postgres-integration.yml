@@ -8,6 +8,7 @@ on:
       - "backend/order-adapters-persistence/**"
       - "backend/order-api/**"
       - "backend/catalog-*/**"
+      - "backend/identity-*/**"
       - "pom.xml"
       - ".github/workflows/postgres-integration.yml"
   workflow_dispatch:
