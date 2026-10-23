@@ -23,6 +23,19 @@
       "network": "egress",
       "dockerAccess": true,
       "timeoutSeconds": 2400
+    },
+    {
+      "key": "frontend-unit",
+      "name": "Order web unit and accessibility tests",
+      "description": "Vitest for frontend/order-web (components, API client, accessibility checks), with JUnit output. Runs on pull requests only when the order web app changes.",
+      "image": "node:22.21.1-bookworm-slim",
+      "command": ["sh", "-c", "cd frontend/order-web && npm ci --no-audit --no-fund && npx vitest run --reporter=default --reporter=junit --outputFile.junit=test-results/TEST-vitest.xml"],
+      "reportDirs": ["frontend/order-web/test-results"],
+      "network": "egress",
+      "dockerAccess": false,
+      "timeoutSeconds": 900,
+      "selection": "paths",
+      "paths": ["frontend/order-web/"]
     }
   ]
 }
