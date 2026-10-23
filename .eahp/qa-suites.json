@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "suites": [
+    {
+      "key": "backend-unit",
+      "name": "Backend unit and slice tests",
+      "description": "Every backend test that needs no Docker. Testcontainers tests are tagged docker and excluded here.",
+      "image": "maven:3.9.11-eclipse-temurin-17",
+      "command": ["mvn", "-B", "-ntp", "verify", "-DskipTests=false", "-DexcludedGroups=docker"],
+      "reportDirs": ["target/surefire-reports", "target/failsafe-reports"],
+      "network": "egress",
+      "dockerAccess": false,
+      "timeoutSeconds": 1800,
+      "selection": "maven-modules"
+    },
+    {
+      "key": "backend-integration",
+      "name": "Backend PostgreSQL integration tests",
+      "description": "Every test tagged docker (Testcontainers PostgreSQL) in all modules, including identity and catalog migrations.",
+      "image": "maven:3.9.11-eclipse-temurin-17",
+      "command": ["mvn", "-B", "-ntp", "verify", "-Dgroups=docker", "-Dsurefire.failIfNoSpecifiedTests=false"],
+      "reportDirs": ["target/surefire-reports", "target/failsafe-reports"],
+      "network": "egress",
+      "dockerAccess": true,
+      "timeoutSeconds": 2400
+    },
+    {
+      "key": "frontend-unit",
+      "name": "Order web unit and accessibility tests",
+      "description": "Vitest for frontend/order-web (components, API client, accessibility checks), with JUnit output. Runs on pull requests only when the order web app changes.",
+      "image": "node:22.21.1-bookworm-slim",
+      "command": ["sh", "-c", "cd frontend/order-web && npm ci --no-audit --no-fund && npx vitest run --reporter=default --reporter=junit --outputFile.junit=test-results/TEST-vitest.xml"],
+      "reportDirs": ["frontend/order-web/test-results"],
+      "network": "egress",
+      "dockerAccess": false,
+      "timeoutSeconds": 900,
+      "selection": "paths",
+      "paths": ["frontend/order-web/"]
+    }
+  ]
+}
