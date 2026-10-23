@@ -1,0 +1,1 @@
+CALL catalog_preflight_and_backfill_legacy_products(500);
