@@ -19,6 +19,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.dao.EmptyResultDataAccessException;
+import org.springframework.http.MediaType;
 
 @WebMvcTest(controllers = IdentityController.class, properties = "identity.security.enabled=true")
 @Import({OidcSecurityConfiguration.class, CorrelationIdFilter.class})
@@ -39,9 +41,27 @@ class IdentitySecurityTest {
   }
 
   @Test void missingAndMalformedTokensAre401() throws Exception {
-    mvc.perform(get("/api/v1/me")).andExpect(status().isUnauthorized()).andExpect(content().contentType("application/problem+json"));
+    mvc.perform(get("/api/v1/me")).andExpect(status().isUnauthorized()).andExpect(content().contentType("application/problem+json"))
+        .andExpect(header().string("WWW-Authenticate", "Bearer")).andExpect(jsonPath("$.correlationId").exists());
     mvc.perform(get("/api/v1/me").header("Authorization", "Bearer not-a-jwt"))
         .andExpect(status().isUnauthorized());
+  }
+
+  @Test void adminErrorsAreRfc9457AndNotMaskedByErrorDispatch() throws Exception {
+    when(directory.active(anyString(), anyString())).thenReturn(Optional.of(new IdentityPrincipal(USER, "Admin", Set.of("rbac:manage"))));
+    mvc.perform(put("/api/v1/admin/users/not-a-uuid/roles/" + UUID.randomUUID()).with(externalJwt()))
+        .andExpect(status().isBadRequest()).andExpect(content().contentType("application/problem+json"))
+        .andExpect(jsonPath("$.code").value("MALFORMED_REQUEST"));
+    mvc.perform(put("/api/v1/admin/users/{u}/roles/{r}", UUID.randomUUID(), UUID.randomUUID())
+        .contentType(MediaType.APPLICATION_JSON).content("{not-json").with(externalJwt()))
+        .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("MALFORMED_REQUEST"));
+    mvc.perform(put("/api/v1/admin/users/{u}/roles/{r}", UUID.randomUUID(), UUID.randomUUID())
+        .contentType(MediaType.APPLICATION_JSON).content("{\"expiresAt\":\"2020-01-01T00:00:00Z\"}").with(externalJwt()))
+        .andExpect(status().isUnprocessableEntity()).andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
+    doThrow(new EmptyResultDataAccessException(1)).when(assignments).grantRole(any(), any(), any(), any(), any());
+    mvc.perform(put("/api/v1/admin/users/{u}/roles/{r}", UUID.randomUUID(), UUID.randomUUID())
+        .contentType(MediaType.APPLICATION_JSON).content("{}").with(externalJwt()))
+        .andExpect(status().isNotFound()).andExpect(jsonPath("$.code").value("RESOURCE_NOT_FOUND"));
   }
 
   @Test void validExternalIdentityWithoutActiveLocalPrincipalIs403() throws Exception {

@@ -1,6 +1,9 @@
 package com.example.onlineshop.catalog.api;
 
 import java.util.*;
+import java.time.Duration;
+import java.io.IOException;
+import jakarta.servlet.http.*;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.*;
@@ -19,15 +22,24 @@ class CatalogSecurityConfiguration {
   @ConditionalOnProperty(name="catalog.security.enabled", havingValue="true")
   JwtDecoder catalogJwtDecoder(@Value("${catalog.security.jwk-set-uri}") String jwks,
       @Value("${catalog.security.issuer}") String issuer, @Value("${catalog.security.audience}") String audience,
-      @Value("${catalog.security.algorithm:RS256}") String algorithm) {
+      @Value("${catalog.security.algorithm:RS256}") String algorithm,
+      @Value("${catalog.security.clock-skew:PT0S}") Duration clockSkew) {
     if (jwks.isBlank() || issuer.isBlank() || audience.isBlank()) throw new IllegalStateException("strict OIDC settings are required");
     if (!Set.of("RS256", "RS384", "RS512").contains(algorithm)) throw new IllegalStateException("unsupported OIDC algorithm");
     NimbusJwtDecoder decoder = NimbusJwtDecoder.withJwkSetUri(jwks).jwsAlgorithm(SignatureAlgorithm.valueOf(algorithm)).build();
-    OAuth2TokenValidator<Jwt> audienceValidator = jwt -> jwt.getAudience().contains(audience)
+    if (clockSkew.isNegative() || clockSkew.compareTo(Duration.ofSeconds(30)) > 0) throw new IllegalStateException("OIDC clock skew must be between PT0S and PT30S");
+    OAuth2TokenValidator<Jwt> expiryRequired = jwt -> jwt.getExpiresAt() != null ? OAuth2TokenValidatorResult.success()
+        : OAuth2TokenValidatorResult.failure(new OAuth2Error("invalid_token", "exp claim is required", null));
+    OAuth2TokenValidator<Jwt> audienceValidator = jwt -> jwt.getAudience() != null && jwt.getAudience().contains(audience)
         ? OAuth2TokenValidatorResult.success()
         : OAuth2TokenValidatorResult.failure(new OAuth2Error("invalid_token", "required audience is missing", null));
-    decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(JwtValidators.createDefaultWithIssuer(issuer), audienceValidator));
+    decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(new JwtTimestampValidator(clockSkew), expiryRequired,
+        new JwtIssuerValidator(issuer), audienceValidator));
     return decoder;
+  }
+
+  JwtDecoder catalogJwtDecoder(String jwks, String issuer, String audience, String algorithm) {
+    return catalogJwtDecoder(jwks, issuer, audience, algorithm, Duration.ZERO);
   }
 
   @Bean
@@ -42,7 +54,8 @@ class CatalogSecurityConfiguration {
             .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/products").hasAuthority("PERM_catalog:write")
             .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/products/**").permitAll()
             .anyRequest().denyAll())
-        .oauth2ResourceServer(server -> server.jwt(jwt -> jwt.jwtAuthenticationConverter(token -> {
+        .oauth2ResourceServer(server -> server.authenticationEntryPoint((req,res,e) -> problem(req,res,401,"AUTHENTICATION_REQUIRED"))
+          .jwt(jwt -> jwt.jwtAuthenticationConverter(token -> {
           Collection<org.springframework.security.core.GrantedAuthority> authorities;
           try {
             MeResponse me = identity.get().uri("/api/v1/me")
@@ -54,7 +67,7 @@ class CatalogSecurityConfiguration {
             authorities = List.of();
           }
           return new JwtAuthenticationToken(token, authorities);
-        }))).build();
+        }))).exceptionHandling(errors -> errors.accessDeniedHandler((req,res,e) -> problem(req,res,403,"ACCESS_DENIED"))).build();
   }
 
   @Bean
@@ -64,4 +77,13 @@ class CatalogSecurityConfiguration {
   }
 
   private record MeResponse(UUID id, String displayName, Set<String> permissions) {}
+
+  private static void problem(HttpServletRequest request, HttpServletResponse response, int status, String code) throws IOException {
+    response.setStatus(status); response.setContentType("application/problem+json");
+    if (status == 401) response.setHeader("WWW-Authenticate", "Bearer");
+    String correlation = Optional.ofNullable(request.getHeader("X-Correlation-ID")).orElseGet(() -> UUID.randomUUID().toString());
+    response.setHeader("X-Correlation-ID", correlation);
+    response.getWriter().printf("{\"type\":\"https://online-shop.example/problems/%s\",\"title\":\"Request denied\",\"status\":%d,\"detail\":\"Request denied\",\"instance\":\"%s\",\"code\":\"%s\",\"violations\":[],\"correlationId\":\"%s\"}", code.toLowerCase(Locale.ROOT), status, json(request.getRequestURI()), code, json(correlation));
+  }
+  private static String json(String value) { return Objects.toString(value, "").replace("\\", "\\\\").replace("\"", "\\\""); }
 }

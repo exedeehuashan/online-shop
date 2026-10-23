@@ -23,15 +23,20 @@ final class IdentityController {
     return new Me(principal.id(), principal.displayName(), new TreeSet<>(principal.permissions()));
   }
 
-  @GetMapping("/admin/users") List<IdentityDirectory.UserView> users() { return directory.users(); }
-  @GetMapping("/admin/roles") List<IdentityDirectory.RoleView> roles() { return directory.roles(); }
-  @GetMapping("/admin/permissions") List<IdentityDirectory.PermissionView> permissions() { return directory.permissions(); }
+  @GetMapping("/admin/users") List<IdentityDirectory.UserView> users(
+      @RequestParam(defaultValue="0") int page, @RequestParam(defaultValue="20") int size) { return directory.users(page, size); }
+  @GetMapping("/admin/roles") List<IdentityDirectory.RoleView> roles(
+      @RequestParam(defaultValue="0") int page, @RequestParam(defaultValue="20") int size) { return directory.roles(page, size); }
+  @GetMapping("/admin/permissions") List<IdentityDirectory.PermissionView> permissions(
+      @RequestParam(defaultValue="0") int page, @RequestParam(defaultValue="20") int size) { return directory.permissions(page, size); }
 
   @PutMapping("/admin/users/{userId}/roles/{roleId}")
   ResponseEntity<Void> grantRole(@PathVariable UUID userId, @PathVariable UUID roleId,
       @RequestBody(required = false) RoleGrant request, @AuthenticationPrincipal IdentityPrincipal actor,
       HttpServletRequest servletRequest) {
-    assignments.grantRole(userId, roleId, actor.id(), request == null ? null : request.expiresAt(), correlation(servletRequest));
+    Instant expiry = request == null ? null : request.expiresAt();
+    if (expiry != null && !expiry.isAfter(Instant.now())) throw new AdminValidationException("expiresAt must be in the future");
+    assignments.grantRole(userId, roleId, actor.id(), expiry, correlation(servletRequest));
     directory.invalidate(userId);
     return ResponseEntity.noContent().build();
   }

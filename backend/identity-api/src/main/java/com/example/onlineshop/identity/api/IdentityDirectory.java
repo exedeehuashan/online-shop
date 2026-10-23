@@ -21,22 +21,31 @@ class IdentityDirectory {
   void invalidate(UUID user) { cache.invalidate(user); }
   void invalidateAll() { cache.invalidateAll(); }
 
-  List<UserView> users() {
-    return jdbc.query("select id,issuer,subject,display_name,status,version from sys_user order by id",
+  List<UserView> users(int page, int size) {
+    int[] bounds = bounds(page, size);
+    return jdbc.query("select id,issuer,subject,display_name,status,version from sys_user order by id limit ? offset ?",
         (rs, row) -> new UserView(rs.getObject("id", UUID.class), rs.getString("issuer"),
-            rs.getString("subject"), rs.getString("display_name"), rs.getString("status"), rs.getLong("version")));
+            rs.getString("subject"), rs.getString("display_name"), rs.getString("status"), rs.getLong("version")), bounds[0], bounds[1]);
   }
 
-  List<RoleView> roles() {
-    return jdbc.query("select id,code,name,status,system_role,version from sys_role order by code,id",
+  List<RoleView> roles(int page, int size) {
+    int[] bounds = bounds(page, size);
+    return jdbc.query("select id,code,name,status,system_role,version from sys_role order by code,id limit ? offset ?",
         (rs, row) -> new RoleView(rs.getObject("id", UUID.class), rs.getString("code"), rs.getString("name"),
-            rs.getString("status"), rs.getBoolean("system_role"), rs.getLong("version")));
+            rs.getString("status"), rs.getBoolean("system_role"), rs.getLong("version")), bounds[0], bounds[1]);
   }
 
-  List<PermissionView> permissions() {
-    return jdbc.query("select id,code,description,status,version from sys_permission order by code,id",
+  List<PermissionView> permissions(int page, int size) {
+    int[] bounds = bounds(page, size);
+    return jdbc.query("select id,code,description,status,version from sys_permission order by code,id limit ? offset ?",
         (rs, row) -> new PermissionView(rs.getObject("id", UUID.class), rs.getString("code"),
-            rs.getString("description"), rs.getString("status"), rs.getLong("version")));
+            rs.getString("description"), rs.getString("status"), rs.getLong("version")), bounds[0], bounds[1]);
+  }
+
+  private static int[] bounds(int page, int size) {
+    if (page < 0 || size < 1 || size > 100) throw new AdminValidationException("page must be >= 0 and size must be between 1 and 100");
+    try { return new int[] { size, Math.multiplyExact(page, size) }; }
+    catch (ArithmeticException overflow) { throw new AdminValidationException("page offset is too large"); }
   }
 
   record UserView(UUID id, String issuer, String subject, String displayName, String status, long version) {}

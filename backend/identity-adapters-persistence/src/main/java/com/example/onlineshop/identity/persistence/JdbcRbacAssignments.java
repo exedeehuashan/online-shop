@@ -15,12 +15,16 @@ public final class JdbcRbacAssignments {
     tx.executeWithoutResult(ignored -> {
       lock("sys_user", userId);
       lock("sys_role", roleId);
+      int previous = jdbc.query("select expires_at from sys_user_role where user_id=? and role_id=?",
+          rs -> rs.next() ? (rs.getTimestamp(1) == null ? 0 : 1) : -1, userId, roleId);
       int changed = jdbc.update("""
           insert into sys_user_role(user_id,role_id,granted_at,granted_by,expires_at)
-          values (?,?,current_timestamp,?,?) on conflict (user_id,role_id) do nothing
+          values (?,?,current_timestamp,?,?) on conflict (user_id,role_id) do update
+          set granted_at=excluded.granted_at, granted_by=excluded.granted_by, expires_at=excluded.expires_at
+          where sys_user_role.expires_at is distinct from excluded.expires_at
           """, userId, roleId, actorId, expiresAt == null ? null : java.sql.Timestamp.from(expiresAt));
       audit(actorId, "sys_user_role", userId, userId, roleId, null, "ROLE_GRANTED", correlationId,
-          changed == 1 ? "GRANTED" : "ALREADY_GRANTED");
+          changed == 0 ? "ALREADY_GRANTED" : previous == -1 ? "GRANTED" : "EXPIRY_UPDATED");
     });
   }
 

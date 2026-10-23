@@ -12,6 +12,8 @@ spring:
     locations: classpath:db/catalog
 catalog:
   security:
+    # Access tokens require exp; expiry/nbf are enforced with explicit zero clock skew.
+    clock-skew: ${CATALOG_OIDC_CLOCK_SKEW:PT0S}
     enabled: ${CATALOG_SECURITY_ENABLED:false}
     issuer: ${CATALOG_OIDC_ISSUER:}
     audience: ${CATALOG_OIDC_AUDIENCE:}

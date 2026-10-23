@@ -25,6 +25,12 @@ class EffectivePermissionCacheTest {
     assertThatThrownBy(() -> new EffectivePermissionCache(Duration.ofMinutes(6), Clock.systemUTC())).isInstanceOf(IllegalArgumentException.class);
   }
 
+  @Test void boundsEntryCount() {
+    EffectivePermissionCache cache = new EffectivePermissionCache(Duration.ofMinutes(1), Clock.systemUTC(), 2);
+    cache.get(UUID.randomUUID(), Set::of); cache.get(UUID.randomUUID(), Set::of); cache.get(UUID.randomUUID(), Set::of);
+    assertThat(cache.size()).isEqualTo(2);
+  }
+
   @Test void oidcConfigurationFailsClosedForMissingSettingsAndUnsafeAlgorithms() {
     OidcSecurityConfiguration configuration = new OidcSecurityConfiguration();
     assertThatThrownBy(() -> configuration.jwtDecoder("", "https://issuer.example", "shop-api", "RS256"))

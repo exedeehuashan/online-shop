@@ -8,6 +8,8 @@ spring:
     locations: classpath:db/identity
 identity:
   security:
+    # Access tokens require exp; expiry/nbf are enforced with explicit zero clock skew.
+    clock-skew: ${IDENTITY_OIDC_CLOCK_SKEW:PT0S}
     enabled: ${IDENTITY_SECURITY_ENABLED:false}
     issuer: ${IDENTITY_OIDC_ISSUER:}
     audience: ${IDENTITY_OIDC_AUDIENCE:}
