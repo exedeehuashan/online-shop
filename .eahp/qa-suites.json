@@ -106,6 +106,26 @@
       "paths": [
         "frontend/order-web/"
       ]
+    },
+    {
+      "key": "performance",
+      "name": "k6 performance baseline",
+      "description": "tests/performance/scenarios.js (normal mix, idempotent replay, hot reads, optimistic conflicts) against a deployed environment; fails when the script's thresholds (checks > 99%, HTTP errors < 1%) are missed.",
+      "image": "grafana/k6:0.54.0",
+      "command": [
+        "run",
+        "--quiet",
+        "tests/performance/scenarios.js"
+      ],
+      "reportDirs": [],
+      "results": "exit-code",
+      "network": "egress",
+      "dockerAccess": false,
+      "timeoutSeconds": 600,
+      "environment": {
+        "ORDER_API": "order-api",
+        "CATALOG_API": "catalog-api"
+      }
     }
   ]
 }
