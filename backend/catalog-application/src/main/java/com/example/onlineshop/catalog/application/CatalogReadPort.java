@@ -20,7 +20,7 @@ public interface CatalogReadPort {
   record AttributeDefinition(UUID id,String code,String name,String dataType,String scope,boolean variantAxis) {}
   record AttributeValue(UUID id,Object value,String displayValue) {}
   record AttributeSelection(AttributeDefinition definition,List<AttributeValue> values) {}
-  record Sku(UUID id,String sku,boolean isDefault,Money price,int availableQuantity,String availability,
+  record Sku(UUID id,String sku,@com.fasterxml.jackson.annotation.JsonProperty("default") boolean isDefault,Money price,int availableQuantity,String availability,
       List<AttributeSelection> attributes,List<UUID> imageIds) {}
   record VariantOption(UUID id,Object value,String displayValue,String availability) {}
   record VariantAxis(AttributeDefinition definition,List<VariantOption> options) {}

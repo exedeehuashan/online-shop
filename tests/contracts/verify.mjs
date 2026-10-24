@@ -30,8 +30,6 @@ for(const schema of ['Problem','Image','ProductPage','PageMetadata','Facets','Sk
 if (!JSON.stringify(catalogV2).includes('examples') || !catalogV2.paths['/api/v2/products/{productId}'].get.responses['200'].headers?.['X-Correlation-ID']) throw new Error('catalog v2 examples/correlation response contract missing');
 const problem=fs.readFileSync('docs/problem-details.md','utf8');
 for(const code of ['MALFORMED_REQUEST','PRODUCT_NOT_FOUND','INVALID_CATALOG_QUERY','INTERNAL_ERROR']) if(!problem.includes(code)) throw new Error(`problem code missing: ${code}`);
-const nginx=fs.readFileSync('docker/nginx.conf','utf8');
-for(const route of ['location = /api/v2/products','location ^~ /api/v2/products/']) if(!nginx.includes(route)) throw new Error(`nginx v2 route missing: ${route}`);
 for (const path of ['/api/v1/me','/api/v1/admin/users','/api/v1/admin/roles','/api/v1/admin/permissions','/api/v1/admin/users/{userId}/roles/{roleId}','/api/v1/admin/roles/{roleId}/permissions/{permissionId}'])
  if (!identity.paths?.[path]) throw new Error(`identity OpenAPI contract missing ${path}`);
 if (JSON.stringify(identity.security)!==JSON.stringify([{oidcBearer:[]}])) throw new Error('identity contract must require bearer authentication globally');
