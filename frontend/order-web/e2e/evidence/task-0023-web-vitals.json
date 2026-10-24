@@ -1,0 +1,13 @@
+{
+  "profile": {"browser":"Chromium 141.0.7390.37","viewportCssPx":["320x640","1280x800"],"network":"40ms latency, 12.8Mbps down, 6Mbps up","cpu":"2x slowdown","cache":"disabled","fixture":"mock image-rich Green Tea v2 response","runsPerScenario":5,"aggregation":"worst"},
+  "candidateBaseline": "502f468c48ab29fe6c050b61c289dbaac89f4f5e",
+  "runs": [
+    {"viewport":320,"route":"/products","lcpMs":[1628,1496,1500,1500,1496],"cls":[0,0,0,0,0]},
+    {"viewport":320,"route":"/products/green-tea","lcpMs":[1480,1480,1476,1484,1488],"cls":[0,0,0,0,0]},
+    {"viewport":1280,"route":"/products","lcpMs":[1504,1508,1496,1508,1500],"cls":[0.05097260459661484,0.05097260459661484,0.05097260459661484,0.05097260459661484,0.05097260459661484]},
+    {"viewport":1280,"route":"/products/green-tea","lcpMs":[1480,1476,1484,1480,1480],"cls":[0.017024688720703125,0.017024688720703125,0.017024688720703125,0.017024688720703125,0.017024688720703125]}
+  ],
+  "worst": {"lcpMs":1628,"cls":0.05097260459661484},
+  "thresholds": {"lcpMs":2500,"cls":0.1},
+  "result":"PASS"
+}

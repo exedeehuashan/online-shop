@@ -2,11 +2,13 @@ import {expect,test} from '@playwright/test';
 import axeCore from 'axe-core';
 
 const orderPage={content:[],page:0,size:20,totalElements:0,totalPages:0};
+const catalogPage={items:[],page:{page:0,size:20,numberOfElements:0,totalElements:0,totalPages:0,first:true,last:true},facets:{categories:[],attributes:[],availability:[],price:null,truncated:false}};
 
 test('real shell is axe-clean and all visible targets are at least 44px at 320px',async({page})=>{
   await page.setViewportSize({width:320,height:800});
   await page.addInitScript({content:axeCore.source});
   await page.route('**/api/v1/customers/**/orders?**',route=>route.fulfill({json:orderPage}));
+  await page.route(/\/api\/v2\/products/,route=>route.fulfill({json:catalogPage}));
   for(const path of ['/','/products','/forbidden','/offline','/not-a-route','/account/orders']){
     await page.goto(path);
     await expect(page.locator('main')).toBeVisible();
