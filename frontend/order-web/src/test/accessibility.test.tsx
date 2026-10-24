@@ -13,7 +13,7 @@ const expectDocumentAccessible=async()=>expect((await axeCore.run(document)).vio
 afterEach(()=>vi.unstubAllGlobals());
 beforeEach(()=>{document.documentElement.lang='en';document.title='Northstar market'});
 
-it.each(['/','/products','/forbidden','/offline','/not-a-route'])('has no document-level shell violations on %s',async path=>{await mount(path);await expectDocumentAccessible()});
+it.each(['/','/products','/products/green-tea','/forbidden','/offline','/not-a-route'])('has no document-level shell violations on %s',async path=>{const rendered=await mount(path);if(path==='/products')await rendered.findByText('Green Tea');if(path.includes('green-tea'))await rendered.findByRole('heading',{name:'Green Tea'});await expectDocumentAccessible()});
 it('has no document-level violations in the primary list state',async()=>{vi.stubGlobal('fetch',vi.fn(async()=>response(buildOrderPage())));const rendered=await mount('/account/orders');await rendered.findByText('DRAFT');await expectDocumentAccessible()});
 it('has no document-level violations in create validation state',async()=>{const rendered=await mount('/checkout');await userEvent.click(await rendered.findByRole('button',{name:'Submit order'}));await expectDocumentAccessible()});
 it('has no document-level violations in detail and cancellation dialog states',async()=>{vi.stubGlobal('fetch',vi.fn(async()=>response(buildOrderPage().content[0])));const rendered=await mount('/account/orders/11111111-1111-1111-1111-111111111111');await rendered.findByText('Ada Lovelace');await userEvent.click(rendered.getByRole('button',{name:'Cancel order'}));await expectDocumentAccessible()});
