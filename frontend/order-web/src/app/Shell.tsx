@@ -10,8 +10,8 @@ export function AppShell({children}:{children?:ReactNode}){
     <aside className="uat-banner" aria-label="Environment">Controlled UAT environment · Test data only</aside>
     <header className="site-header"><div className="header-inner">
       <Link to="/" className="brand"><span aria-hidden="true" className="brand-mark">N</span><span>Northstar <small>market</small></span></Link>
-      <nav aria-label="Primary"><Link to="/">Home</Link><Link to="/products">Shop</Link><Link to="/account/orders">Orders</Link>{canOperate&&<Link to="/admin/orders">Operations</Link>}</nav>
-      <Link to="/checkout" className="header-action">Create order</Link>
+      <nav aria-label="Primary"><Link to="/">Home</Link><Link to="/products">Shop</Link><Link to="/cart">Cart</Link><Link to="/account/orders">Orders</Link>{canOperate&&<Link to="/admin/orders">Operations</Link>}</nav>
+      <Link to="/cart" className="header-action">View cart</Link>
     </div></header>
     {auth.status==='expired'&&<div className="alert" role="alert">Your session has expired. Sign in again before continuing.</div>}
     {auth.status==='forbidden'&&<div className="alert" role="alert">Your account does not have permission for that action.</div>}
