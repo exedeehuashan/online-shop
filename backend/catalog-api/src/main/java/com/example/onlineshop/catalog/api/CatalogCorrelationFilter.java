@@ -4,5 +4,6 @@ import jakarta.servlet.*;import jakarta.servlet.http.*;import java.io.IOExceptio
 final class CatalogCorrelationFilter extends OncePerRequestFilter {
  static final String HEADER="X-Correlation-ID", ATTRIBUTE=CatalogCorrelationFilter.class.getName();
  protected void doFilterInternal(HttpServletRequest req,HttpServletResponse res,FilterChain chain)throws ServletException,IOException{String raw=req.getHeader(HEADER);String id=valid(raw)?raw:UUID.randomUUID().toString();req.setAttribute(ATTRIBUTE,id);res.setHeader(HEADER,id);try(MDC.MDCCloseable ignored=MDC.putCloseable("correlationId",id)){chain.doFilter(req,res);}}
+ protected boolean shouldNotFilter(HttpServletRequest request){return !request.getRequestURI().startsWith("/api/v2/");}
  static boolean valid(String s){return s!=null&&!s.isEmpty()&&s.length()<=128&&s.chars().allMatch(c->c>=0x21&&c<=0x7e);}
 }
