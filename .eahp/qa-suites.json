@@ -110,13 +110,15 @@
     {
       "key": "performance",
       "name": "k6 performance baseline",
-      "description": "tests/performance/scenarios.js (normal mix, idempotent replay, hot reads, optimistic conflicts) against a deployed environment; fails when the script's thresholds (checks > 99%, HTTP errors < 1%) are missed.",
+      "description": "tests/performance/scenarios.js (normal mix, idempotent replay, hot reads, optimistic conflicts) against a deployed environment; fails when the script's thresholds (checks > 99%, HTTP errors < 1%) are missed. EAHP records p95, throughput and error rate from k6-summary.json.",
       "image": "grafana/k6:0.54.0",
       "command": [
         "run",
         "--quiet",
+        "--summary-export=k6-summary.json",
         "tests/performance/scenarios.js"
       ],
+      "performance": "k6-summary.json",
       "reportDirs": [],
       "results": "exit-code",
       "network": "egress",
