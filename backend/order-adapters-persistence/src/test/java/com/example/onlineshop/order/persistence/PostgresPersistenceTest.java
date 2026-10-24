@@ -40,7 +40,7 @@ class PostgresPersistenceTest {
 
   @BeforeEach void setup() {
     jdbc = new JdbcTemplate(dataSource);
-    jdbc.update("truncate outbox_events, order_idempotency, order_items, orders");
+    jdbc.update("truncate order_audit_events, outbox_events, order_idempotency, order_items, orders");
     orders = new PostgresOrderRepository(jdbc);
     outbox = new PostgresOutboxRepository(jdbc, new java.util.concurrent.atomic.AtomicLong(1000)::incrementAndGet, UUID::randomUUID);
   }
@@ -68,6 +68,19 @@ class PostgresPersistenceTest {
         insert into order_idempotency(customer_ref,idempotency_key,request_hash,order_internal_id,order_public_id,created_at)
         values ('customer-1','mismatched-order',?,5,?,?)""",
         "a".repeat(64), another.id().value(), OffsetDateTime.ofInstant(another.createdAt(), ZoneOffset.UTC)));
+  }
+
+  @Test void authenticatedWritePersistsActorsAndAppendOnlyAudit() {
+    Order order = sample(6, "06060606-0606-0606-0606-060606060606", Instant.parse("2026-10-22T00:00:00Z"));
+    UUID actor = UUID.fromString("aaaaaaaa-1111-2222-3333-bbbbbbbbbbbb");
+    orders.save(order, actor);
+    orders.append(order, actor, "ORDER_CREATED", order.createdAt(), "correlation-1");
+    assertThat(jdbc.queryForObject("select created_by from orders where internal_id=6", UUID.class)).isEqualTo(actor);
+    assertThat(jdbc.queryForObject("select updated_by from orders where internal_id=6", UUID.class)).isEqualTo(actor);
+    assertThat(jdbc.queryForObject("select correlation_id from order_audit_events", String.class)).isEqualTo("correlation-1");
+    assertThatThrownBy(() -> jdbc.update("update order_audit_events set reason_code='changed'"));
+    assertThatThrownBy(() -> jdbc.update("delete from order_audit_events"));
+    assertThatThrownBy(() -> jdbc.update("update orders set created_by=gen_random_uuid() where internal_id=6"));
   }
 
   @Test void hibernateMappingsValidateAgainstFlywaySchema() {

@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { URL } from 'node:url';
 
-const expected = '1d8f91bddbe6fdca9d3702c8aaba96747f69f793824f6da4985af11e971a43d3';
+const expected = '98c02540ed53cc5a001dae8b90ed195e19d2ceb879b0f454b6d7d03f1db5a0f7';
 const document = await readFile(new URL('../openapi/order-api.json', import.meta.url));
 const actual = createHash('sha256').update(document).digest('hex');
 if (actual !== expected) {

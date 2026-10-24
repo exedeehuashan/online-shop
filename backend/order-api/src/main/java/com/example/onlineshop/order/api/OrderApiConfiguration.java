@@ -29,10 +29,10 @@ class OrderApiConfiguration {
   }
   @Bean GetOrderUseCase get(PostgresOrderRepository orders) { return new GetOrderHandler(orders); }
   @Bean ListCustomerOrdersUseCase list(PostgresOrderRepository orders) { return new ListCustomerOrdersHandler(orders); }
-  @Bean ConfirmOrderUseCase confirm(PostgresOrderRepository orders, DomainEventRepository events, Clock clock, TransactionRunner tx, EventMetadataGenerator eventMetadata) {
+  @Bean ConfirmOrderHandler confirm(PostgresOrderRepository orders, DomainEventRepository events, Clock clock, TransactionRunner tx, EventMetadataGenerator eventMetadata) {
     return new ConfirmOrderHandler(orders, events, clock, tx, eventMetadata);
   }
-  @Bean CancelOrderUseCase cancel(PostgresOrderRepository orders, DomainEventRepository events, Clock clock, TransactionRunner tx, EventMetadataGenerator eventMetadata) {
+  @Bean CancelOrderHandler cancel(PostgresOrderRepository orders, DomainEventRepository events, Clock clock, TransactionRunner tx, EventMetadataGenerator eventMetadata) {
     return new CancelOrderHandler(orders, events, clock, tx, eventMetadata);
   }
 }

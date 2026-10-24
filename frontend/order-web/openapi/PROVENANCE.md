@@ -1,10 +1,11 @@
 # OpenAPI provenance
 
-- Backend repository commit: `9f14c194dfc0ece7e94f9f09a0f8b629e16a7e2d`
+- Backend baseline: `5c7c5ce528a4c1ac3853b7151cb0c38fc61419e5`
+- Candidate branch: `feat/issue-35-order-v2` (TASK-0024)
 - Source endpoint: `GET /v3/api-docs`
 - Export file: `order-api.json` (raw response bytes; no normalization)
-- SHA-256: `1d8f91bddbe6fdca9d3702c8aaba96747f69f793824f6da4985af11e971a43d3`
-- Size: 8049 bytes
+- SHA-256: `98c02540ed53cc5a001dae8b90ed195e19d2ceb879b0f454b6d7d03f1db5a0f7`
+- Size: 11876 bytes
 
 The API was started from the exact backend commit and the response body was saved directly. `npm run api:check` verifies this checksum before regenerating types.
 

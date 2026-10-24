@@ -3,10 +3,12 @@ package com.example.onlineshop.order.api;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import javax.sql.DataSource;
+import java.util.*;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -19,6 +21,8 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -36,7 +40,37 @@ class OrderApiTest {
   @Autowired DataSource dataSource;
 
   @BeforeEach void clean() {
-    new JdbcTemplate(dataSource).update("truncate outbox_events, order_idempotency, order_items, orders");
+    SecurityContextHolder.clearContext();
+    new JdbcTemplate(dataSource).update("truncate order_audit_events, outbox_events, order_idempotency, order_items, orders");
+  }
+
+  @AfterEach void clearSecurity(){SecurityContextHolder.clearContext();}
+
+  @Test void v2DerivesOwnerAndRejectsIdentityFields() throws Exception {
+    UUID user=UUID.fromString("11111111-2222-3333-4444-555555555555");
+    var selfAuth=new UsernamePasswordAuthenticationToken(new OrderPrincipal(user,Set.of("order:read:self")),null,List.of());
+    String created=mvc.perform(post("/api/v2/me/orders").with(authentication(selfAuth)).header("Idempotency-Key","v2-key")
+        .contentType(MediaType.APPLICATION_JSON).content(validOrder("V2-SKU")))
+        .andExpect(status().isCreated()).andExpect(header().string("Location",org.hamcrest.Matchers.startsWith("/api/v2/me/orders/")))
+        .andExpect(header().string("ETag","\"0\"")).andExpect(jsonPath("$.customerId").value(user.toString()))
+        .andReturn().getResponse().getContentAsString();
+    String id=json.readTree(created).get("id").asText();
+    mvc.perform(get("/api/v2/me/orders/{id}",id).with(authentication(selfAuth))).andExpect(status().isOk()).andExpect(header().string("ETag","\"0\""));
+    assertThat(new JdbcTemplate(dataSource).queryForObject("select created_by from orders",UUID.class)).isEqualTo(user);
+    assertThat(new JdbcTemplate(dataSource).queryForObject("select count(*) from order_audit_events",Integer.class)).isOne();
+    mvc.perform(post("/api/v2/me/orders").with(authentication(selfAuth)).header("Idempotency-Key","bad")
+        .contentType(MediaType.APPLICATION_JSON).content(validOrder("BAD").replace("{\"customerName\"","{\"customerId\":\"other\",\"customerName\"")))
+        .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("MALFORMED_REQUEST"));
+  }
+
+  @Test void v2SelfScopeHidesForeignOrderAndAdminNeedsBothActionGrants() throws Exception {
+    String id=create("owner-order",validOrder("OWNER"));
+    UUID self=UUID.fromString("22222222-2222-2222-2222-222222222222");
+    var selfAuth=new UsernamePasswordAuthenticationToken(new OrderPrincipal(self,Set.of("order:read:self")),null,List.of());
+    mvc.perform(get("/api/v2/me/orders/{id}",id).with(authentication(selfAuth))).andExpect(status().isNotFound()).andExpect(jsonPath("$.code").value("ORDER_NOT_FOUND"));
+    var readAny=new UsernamePasswordAuthenticationToken(new OrderPrincipal(self,Set.of("order:read:any")),null,List.of());
+    mvc.perform(post("/api/v2/admin/orders/{id}/confirmation",id).with(authentication(readAny)).header("If-Match","\"0\""))
+        .andExpect(status().isForbidden()).andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
   }
 
   @Test void createReplayListDetailConfirmAndCancelExposeOnlyPublicIds() throws Exception {
@@ -97,7 +131,10 @@ class OrderApiTest {
     mvc.perform(get("/v3/api-docs")).andExpect(status().isOk())
         .andExpect(jsonPath("$.paths['/api/v1/customers/{customerId}/orders']").exists())
         .andExpect(jsonPath("$.paths['/api/v1/customers/{customerId}/orders/{orderId}/confirmation']").exists())
-        .andExpect(jsonPath("$.info.description").value(org.hamcrest.Matchers.containsString("development and controlled UAT")))
+        .andExpect(jsonPath("$.info.description").value(org.hamcrest.Matchers.containsString("principal-derived v2 ownership")))
+        .andExpect(jsonPath("$.paths['/api/v2/me/orders']").exists())
+        .andExpect(jsonPath("$.paths['/api/v2/admin/orders']").exists())
+        .andExpect(jsonPath("$.security[0].oidcBearer").isArray())
         .andExpect(jsonPath("$.paths['/api/v1/customers/{customerId}/orders'].post.responses['201'].headers.Location").exists())
         .andExpect(jsonPath("$.paths['/api/v1/customers/{customerId}/orders'].post.responses['400'].content['application/problem+json'].schema['$ref']").value(org.hamcrest.Matchers.endsWith("/ProblemDetail")))
         .andExpect(jsonPath("$.components.schemas.CancelRequest.required[0]").value("reason"));

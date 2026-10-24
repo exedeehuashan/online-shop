@@ -13,15 +13,16 @@ import java.security.MessageDigest;
 import java.util.*;
 import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
+import jakarta.servlet.http.HttpServletRequest;
 
 @RestController
 @RequestMapping("/api/v1/customers/{customerId}/orders")
 class OrderController {
   private final CreateOrderHandler create; private final GetOrderUseCase get; private final ListCustomerOrdersUseCase list;
-  private final ConfirmOrderUseCase confirm; private final CancelOrderUseCase cancel;
+  private final ConfirmOrderHandler confirm; private final CancelOrderHandler cancel; private final OrderAccessPolicy access;
   OrderController(CreateOrderHandler create, GetOrderUseCase get, ListCustomerOrdersUseCase list,
-                  ConfirmOrderUseCase confirm, CancelOrderUseCase cancel) {
-    this.create=create; this.get=get; this.list=list; this.confirm=confirm; this.cancel=cancel;
+                  ConfirmOrderHandler confirm, CancelOrderHandler cancel, OrderAccessPolicy access) {
+    this.create=create; this.get=get; this.list=list; this.confirm=confirm; this.cancel=cancel; this.access=access;
   }
 
   @PostMapping
@@ -34,10 +35,14 @@ class OrderController {
     @ApiResponse(responseCode="415",content=@Content(mediaType="application/problem+json",schema=@Schema(implementation=ProblemDetail.class))),
     @ApiResponse(responseCode="422",content=@Content(mediaType="application/problem+json",schema=@Schema(implementation=ProblemDetail.class)))})
   ResponseEntity<OrderResponse> create(@PathVariable String customerId, @RequestHeader("Idempotency-Key") String key,
-      @RequestBody CreateRequest request) {
+      @RequestBody CreateRequest request, HttpServletRequest http) {
+    OrderPrincipal principal=access.authorizeV1(customerId,false);
     validateKey(key);
     CreateOrderCommand command = request.command(customerId);
-    CreateOrderResult result = create.handle(command, key, hash(request));
+    boolean other=principal!=null&&!principal.userId().toString().equals(customerId);
+    if(other&&!principal.permits("order:manage")) throw new org.springframework.security.access.AccessDeniedException("Request denied");
+    CreateOrderResult result = principal==null?create.handle(command,key,hash(request)):
+        create.handle(command,key,hash(request),principal.userId(),other?"V1_CREATE_FOR_OTHER":"ORDER_CREATED",OrderCorrelationFilter.current(http));
     OrderResponse body = OrderResponse.from(result.order());
     if (result.replay()) return ResponseEntity.ok(body);
     return ResponseEntity.created(URI.create("/api/v1/customers/" + customerId + "/orders/" + body.id())).body(body);
@@ -46,6 +51,7 @@ class OrderController {
   @GetMapping("/{orderId}")
   @ApiResponses({@ApiResponse(responseCode="200"),@ApiResponse(responseCode="400",content=@Content(mediaType="application/problem+json",schema=@Schema(implementation=ProblemDetail.class))),@ApiResponse(responseCode="404",content=@Content(mediaType="application/problem+json",schema=@Schema(implementation=ProblemDetail.class)))})
   OrderResponse detail(@PathVariable String customerId, @PathVariable UUID orderId) {
+    access.authorizeV1(customerId,false);
     return OrderResponse.from(get.handle(new GetOrderQuery(customerId, new OrderId(orderId))));
   }
 
@@ -53,31 +59,38 @@ class OrderController {
   @ApiResponses({@ApiResponse(responseCode="200"),@ApiResponse(responseCode="400",content=@Content(mediaType="application/problem+json",schema=@Schema(implementation=ProblemDetail.class))),@ApiResponse(responseCode="422",content=@Content(mediaType="application/problem+json",schema=@Schema(implementation=ProblemDetail.class)))})
   PageResponse list(@PathVariable String customerId, @RequestParam(defaultValue="0") int page,
                     @RequestParam(defaultValue="20") int size) {
+    access.authorizeV1(customerId,false);
     try { return new PageResponse(list.handle(new ListCustomerOrdersQuery(customerId,page,size)).stream().map(OrderResponse::from).toList(),page,size); }
     catch (IllegalArgumentException e) { throw new DomainValidationException(DomainErrorCode.INVALID_VALUE,e.getMessage()); }
   }
 
   @PostMapping("/{orderId}/confirmation")
   @ApiResponses({@ApiResponse(responseCode="200"),@ApiResponse(responseCode="400",content=@Content(mediaType="application/problem+json",schema=@Schema(implementation=ProblemDetail.class))),@ApiResponse(responseCode="404",content=@Content(mediaType="application/problem+json",schema=@Schema(implementation=ProblemDetail.class))),@ApiResponse(responseCode="409",content=@Content(mediaType="application/problem+json",schema=@Schema(implementation=ProblemDetail.class)))})
-  OrderResponse confirm(@PathVariable String customerId, @PathVariable UUID orderId, @RequestHeader("If-Match") String ifMatch) {
-    return OrderResponse.from(confirm.handle(new ConfirmOrderCommand(customerId,new OrderId(orderId),version(ifMatch))));
+  OrderResponse confirm(@PathVariable String customerId, @PathVariable UUID orderId, @RequestHeader("If-Match") String ifMatch,HttpServletRequest http) {
+    OrderPrincipal principal=access.authorizeV1(customerId,true);
+    return OrderResponse.from(principal==null?confirm.handle(new ConfirmOrderCommand(customerId,new OrderId(orderId),version(ifMatch))):
+      confirm.handle(new ConfirmOrderCommand(customerId,new OrderId(orderId),version(ifMatch)),principal.userId(),
+        principal.userId().toString().equals(customerId)?"ORDER_CONFIRMED":"V1_MANAGE_FOR_OTHER",OrderCorrelationFilter.current(http)));
   }
 
   @PostMapping("/{orderId}/cancellation")
   @ApiResponses({@ApiResponse(responseCode="200"),@ApiResponse(responseCode="400",content=@Content(mediaType="application/problem+json",schema=@Schema(implementation=ProblemDetail.class))),@ApiResponse(responseCode="404",content=@Content(mediaType="application/problem+json",schema=@Schema(implementation=ProblemDetail.class))),@ApiResponse(responseCode="409",content=@Content(mediaType="application/problem+json",schema=@Schema(implementation=ProblemDetail.class))),@ApiResponse(responseCode="415",content=@Content(mediaType="application/problem+json",schema=@Schema(implementation=ProblemDetail.class))),@ApiResponse(responseCode="422",content=@Content(mediaType="application/problem+json",schema=@Schema(implementation=ProblemDetail.class)))})
   OrderResponse cancel(@PathVariable String customerId, @PathVariable UUID orderId, @RequestHeader("If-Match") String ifMatch,
-                       @RequestBody CancelRequest request) {
-    return OrderResponse.from(cancel.handle(new CancelOrderCommand(customerId,new OrderId(orderId),request.reason(),version(ifMatch))));
+                       @RequestBody CancelRequest request,HttpServletRequest http) {
+    OrderPrincipal principal=access.authorizeV1(customerId,true);
+    return OrderResponse.from(principal==null?cancel.handle(new CancelOrderCommand(customerId,new OrderId(orderId),request.reason(),version(ifMatch))):
+      cancel.handle(new CancelOrderCommand(customerId,new OrderId(orderId),request.reason(),version(ifMatch)),principal.userId(),
+        principal.userId().toString().equals(customerId)?"ORDER_CANCELLED":"V1_MANAGE_FOR_OTHER",OrderCorrelationFilter.current(http)));
   }
 
-  private static long version(String value) {
+  static long version(String value) {
     try { if (value == null || !value.matches("\"[0-9]+\"")) throw new NumberFormatException(); return Long.parseLong(value.substring(1,value.length()-1)); }
     catch (NumberFormatException e) { throw new MalformedHeaderException("If-Match must be a quoted non-negative version"); }
   }
-  private static void validateKey(String key) {
+  static void validateKey(String key) {
     if (key == null || key.isBlank() || key.length()>128) throw new DomainValidationException(DomainErrorCode.INVALID_VALUE,"Idempotency-Key must contain 1 to 128 characters");
   }
-  private static String hash(CreateRequest request) {
+  static String hash(CreateRequest request) {
     try {
       MessageDigest digest=MessageDigest.getInstance("SHA-256");
       String canonical=request.canonical();

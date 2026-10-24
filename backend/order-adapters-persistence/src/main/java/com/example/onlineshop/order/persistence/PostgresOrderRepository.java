@@ -7,7 +7,7 @@ import java.time.*;
 import java.util.*;
 import org.springframework.jdbc.core.JdbcTemplate;
 
-public final class PostgresOrderRepository implements OrderRepository {
+public final class PostgresOrderRepository implements OrderRepository, OrderAuditRepository {
   private static final String SELECT_ORDER = """
       select internal_id,public_id,customer_ref,customer_internal_id,customer_name_snapshot,status,currency,total_amount,
              recipient,address_line1,address_line2,city,region,postal_code,country_code,phone,cancellation_reason,version,created_at,updated_at
@@ -16,21 +16,25 @@ public final class PostgresOrderRepository implements OrderRepository {
   public PostgresOrderRepository(JdbcTemplate jdbc) { this.jdbc = Objects.requireNonNull(jdbc); }
 
   @Override public Order save(Order order) {
+    return save(order, null);
+  }
+
+  @Override public Order save(Order order, UUID createdBy) {
     Integer count = jdbc.queryForObject("select count(*) from orders where internal_id=?", Integer.class, order.internalId().value());
-    if (count == 0) insert(order); else update(order);
+    if (count == 0) insert(order, createdBy); else update(order);
     order.markPersisted();
     return order;
   }
 
-  private void insert(Order order) {
+  private void insert(Order order, UUID createdBy) {
     AddressSnapshot a = order.shippingAddress();
     jdbc.update("""
         insert into orders(internal_id,public_id,customer_ref,customer_internal_id,customer_name_snapshot,status,currency,total_amount,item_count,
-          recipient,address_line1,address_line2,city,region,postal_code,country_code,phone,cancellation_reason,version,created_at,updated_at)
-        values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+          recipient,address_line1,address_line2,city,region,postal_code,country_code,phone,cancellation_reason,version,created_at,updated_at,created_by,updated_by)
+        values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
         order.internalId().value(), order.id().value(), order.customerReference().value(), order.customerInternalId(), order.customerNameSnapshot(),
         order.status().name(), order.total().currency(), order.total().amount(), order.items().size(), a.recipient(), a.line1(), a.line2(), a.city(), a.region(),
-        a.postalCode(), a.countryCode(), a.phone(), order.cancellationReason().orElse(null), order.version(), utc(order.createdAt()), utc(order.updatedAt()));
+        a.postalCode(), a.countryCode(), a.phone(), order.cancellationReason().orElse(null), order.version(), utc(order.createdAt()), utc(order.updatedAt()), createdBy, createdBy);
     for (OrderItem item : order.items()) {
       jdbc.update("""
           insert into order_items(internal_id,order_internal_id,product_ref,product_internal_id,sku,product_name_snapshot,
@@ -56,6 +60,31 @@ public final class PostgresOrderRepository implements OrderRepository {
     long offset = Math.multiplyExact((long) page, size);
     return jdbc.query(SELECT_ORDER + " where customer_ref=? order by created_at desc,internal_id desc limit ? offset ?", this::mapOrderRow,
         customer.value(), size, offset).stream().map(this::reconstitute).toList();
+  }
+
+  @Override public Optional<Order> findById(OrderId id) {
+    return jdbc.query(SELECT_ORDER + " where public_id=?", this::mapOrderRow, id.value()).stream().findFirst().map(this::reconstitute);
+  }
+
+  @Override public List<Order> findAll(int page, int size) {
+    long offset = Math.multiplyExact((long) page, size);
+    return jdbc.query(SELECT_ORDER + " order by created_at desc,internal_id desc limit ? offset ?", this::mapOrderRow,
+        size, offset).stream().map(this::reconstitute).toList();
+  }
+
+  @Override public void setCreatedActor(OrderInternalId id, UUID actorId) {
+    throw new UnsupportedOperationException("created actor must be supplied at insert");
+  }
+
+  @Override public void setUpdatedActor(OrderInternalId id, UUID actorId) {
+    jdbc.update("update orders set updated_by=? where internal_id=?", actorId, id.value());
+  }
+
+  @Override public void append(Order order, UUID actorId, String action, Instant occurredAt, String correlationId) {
+    jdbc.update("""
+        insert into order_audit_events(event_id,order_internal_id,order_public_id,actor_id,action,occurred_at,correlation_id,outcome)
+        values (?,?,?,?,?,?,?,'SUCCEEDED')""", UUID.randomUUID(), order.internalId().value(), order.id().value(), actorId,
+        action, utc(occurredAt), Objects.requireNonNullElse(correlationId, UUID.randomUUID().toString()));
   }
 
   private Order reconstitute(OrderRow row) {

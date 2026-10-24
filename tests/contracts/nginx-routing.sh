@@ -44,8 +44,13 @@ assert_upstream GET /api/v2/products/00000000-0000-0000-0000-000000000001 catalo
 assert_upstream GET /api/v2/products/by-slug/green-tea catalog
 assert_upstream GET /api/v2/products/unknown-child catalog
 assert_upstream HEAD /api/v2/products catalog
-assert_upstream GET /api/v2/products-extra order
-assert_upstream GET /api/v2/productsX order
+test "$(curl -sS -o /dev/null -w '%{http_code}' "$base/api/v2/products-extra")" = 404
+test "$(curl -sS -o /dev/null -w '%{http_code}' "$base/api/v2/productsX")" = 404
 assert_upstream GET /api/v1/products catalog
-assert_upstream GET /api/v1/orders order
+assert_upstream GET /api/v1/customers/customer/orders order
+assert_upstream GET /api/v2/me/orders order
+assert_upstream GET /api/v2/me/orders/00000000-0000-0000-0000-000000000001 order
+assert_upstream GET /api/v2/admin/orders order
+assert_upstream GET /api/v2/admin/orders/00000000-0000-0000-0000-000000000001 order
+test "$(curl -sS -o /dev/null -w '%{http_code}' "$base/api/v2/orders")" = 404
 echo 'Functional nginx routing assertions passed'
