@@ -1,0 +1,27 @@
+{
+  "openapi":"3.1.0",
+  "info":{"title":"Online Shop Catalog Public Read API","version":"2.0.0"},
+  "paths":{
+    "/api/v2/products":{"get":{"operationId":"browseProducts","parameters":[
+      {"name":"page","in":"query","schema":{"type":"integer","minimum":0,"default":0}},
+      {"name":"size","in":"query","schema":{"type":"integer","minimum":1,"maximum":100,"default":20}},
+      {"name":"sort","in":"query","schema":{"type":"string","enum":["updated-desc","name-asc","price-asc","price-desc"],"default":"updated-desc"}},
+      {"name":"category","in":"query","schema":{"type":"array","maxItems":50,"items":{"type":"string"}}},
+      {"name":"attribute","in":"query","schema":{"type":"array","maxItems":50,"items":{"type":"string","pattern":"^[^:]+:[0-9a-fA-F-]{36}$"}}},
+      {"name":"availability","in":"query","schema":{"type":"string","enum":["any","in-stock","out-of-stock"],"default":"any"}},
+      {"name":"minPrice","in":"query","schema":{"type":"string","pattern":"^[0-9]+(?:\\.[0-9]{1,2})?$"}},
+      {"name":"maxPrice","in":"query","schema":{"type":"string","pattern":"^[0-9]+(?:\\.[0-9]{1,2})?$"}},
+      {"name":"currency","in":"query","schema":{"type":"string","pattern":"^[A-Z]{3}$"}}
+    ],"responses":{"200":{"description":"Product page","headers":{"X-Correlation-ID":{"schema":{"type":"string"}}},"content":{"application/json":{"schema":{"$ref":"#/components/schemas/ProductPage"}}}},"400":{"$ref":"#/components/responses/Problem"},"422":{"$ref":"#/components/responses/Problem"},"500":{"$ref":"#/components/responses/Problem"}}}},
+    "/api/v2/products/{productId}":{"get":{"operationId":"getProductById","parameters":[{"name":"productId","in":"path","required":true,"schema":{"type":"string","format":"uuid"}}],"responses":{"200":{"description":"Product detail","content":{"application/json":{"schema":{"$ref":"#/components/schemas/ProductDetail"}}}},"400":{"$ref":"#/components/responses/Problem"},"404":{"$ref":"#/components/responses/Problem"},"500":{"$ref":"#/components/responses/Problem"}}}},
+    "/api/v2/products/by-slug/{slug}":{"get":{"operationId":"getProductBySlug","parameters":[{"name":"slug","in":"path","required":true,"schema":{"type":"string","maxLength":180,"pattern":"^[a-z0-9]+(?:-[a-z0-9]+)*$"}}],"responses":{"200":{"description":"Product detail","content":{"application/json":{"schema":{"$ref":"#/components/schemas/ProductDetail"}}}},"400":{"$ref":"#/components/responses/Problem"},"404":{"$ref":"#/components/responses/Problem"},"500":{"$ref":"#/components/responses/Problem"}}}}
+  },
+  "components":{"responses":{"Problem":{"description":"RFC 9457 problem","headers":{"X-Correlation-ID":{"schema":{"type":"string"}}},"content":{"application/problem+json":{"schema":{"$ref":"#/components/schemas/Problem"}}}}},"schemas":{
+    "Money":{"type":"object","required":["amount","currency"],"properties":{"amount":{"type":"string","pattern":"^[0-9]+\\.[0-9]{2}$"},"currency":{"type":"string","pattern":"^[A-Z]{3}$"}}},
+    "Image":{"type":"object","required":["id","url","altText","width","height","displayOrder","primary"],"properties":{"id":{"type":"string","format":"uuid"},"skuId":{"type":["string","null"],"format":"uuid"},"url":{"type":"string"},"altText":{"type":"string"},"width":{"type":"integer","minimum":1,"maximum":32768},"height":{"type":"integer","minimum":1,"maximum":32768},"displayOrder":{"type":"integer","minimum":0},"primary":{"type":"boolean"}}},
+    "ProductSummary":{"type":"object","required":["id","slug","name","description","defaultSkuId","price","priceRange","availability","categories","updatedAt"],"properties":{"id":{"type":"string","format":"uuid"},"slug":{"type":"string"},"name":{"type":"string"},"description":{"type":"string"},"defaultSkuId":{"type":"string","format":"uuid"},"price":{"$ref":"#/components/schemas/Money"},"priceRange":{"type":"object"},"availability":{"type":"string","enum":["IN_STOCK","OUT_OF_STOCK"]},"primaryImage":{"oneOf":[{"$ref":"#/components/schemas/Image"},{"type":"null"}]},"categories":{"type":"array","items":{"type":"object"}},"updatedAt":{"type":"string","format":"date-time"}}},
+    "ProductDetail":{"allOf":[{"$ref":"#/components/schemas/ProductSummary"},{"type":"object","required":["createdAt","attributes","variantAxes","skus","images"],"properties":{"createdAt":{"type":"string","format":"date-time"},"attributes":{"type":"array","items":{"type":"object"}},"variantAxes":{"type":"array","items":{"type":"object"}},"skus":{"type":"array","items":{"type":"object"}},"images":{"type":"array","items":{"$ref":"#/components/schemas/Image"}}}}]},
+    "ProductPage":{"type":"object","required":["items","page","facets"],"properties":{"items":{"type":"array","items":{"$ref":"#/components/schemas/ProductSummary"}},"page":{"type":"object"},"facets":{"type":"object"}}},
+    "Problem":{"type":"object","required":["type","title","status","detail","instance","code","correlationId","violations"],"properties":{"type":{"type":"string","format":"uri"},"title":{"type":"string"},"status":{"type":"integer"},"detail":{"type":"string"},"instance":{"type":"string"},"code":{"type":"string"},"correlationId":{"type":"string"},"violations":{"type":"array","items":{"type":"object"}}}}
+  }}
+}

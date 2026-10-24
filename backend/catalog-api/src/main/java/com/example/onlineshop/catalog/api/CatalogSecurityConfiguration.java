@@ -51,6 +51,8 @@ class CatalogSecurityConfiguration {
     return http.csrf(csrf -> csrf.disable())
         .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
         .authorizeHttpRequests(auth -> auth.requestMatchers("/actuator/health").permitAll()
+            .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v2/products/**").permitAll()
+            .requestMatchers(org.springframework.http.HttpMethod.HEAD, "/api/v2/products/**").permitAll()
             .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/products").hasAuthority("PERM_catalog:write")
             .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/products/**").permitAll()
             .anyRequest().denyAll())
