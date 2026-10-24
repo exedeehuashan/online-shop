@@ -8,17 +8,22 @@ const cart=createRoute({getParentRoute:()=>root,path:'/cart',component:lazyRoute
 const forbidden=createRoute({getParentRoute:()=>root,path:'/forbidden',component:ForbiddenPage});
 const offline=createRoute({getParentRoute:()=>root,path:'/offline',component:OfflinePage});
 const adminOrders=createRoute({getParentRoute:()=>root,path:'/admin/orders',component:lazyRouteComponent(()=>import('../routes/Admin'),'AdminOrders')});
+const adminOrderDetail=createRoute({getParentRoute:()=>root,path:'/admin/orders/$orderId',component:lazyRouteComponent(()=>import('../routes/Admin'),'AdminOrderDetail')});
 const accessUsers=createRoute({getParentRoute:()=>root,path:'/admin/access/users',component:lazyRouteComponent(()=>import('../routes/Admin'),'AccessUsers')});
 const accessRoles=createRoute({getParentRoute:()=>root,path:'/admin/access/roles',component:lazyRouteComponent(()=>import('../routes/Admin'),'AccessRoles')});
 const accessPermissions=createRoute({getParentRoute:()=>root,path:'/admin/access/permissions',component:lazyRouteComponent(()=>import('../routes/Admin'),'AccessPermissions')});
 const adminProducts=createRoute({getParentRoute:()=>root,path:'/admin/products',component:lazyRouteComponent(()=>import('../routes/Admin'),'AdminProducts')});
-const orderList=createRoute({getParentRoute:()=>root,path:'/account/orders',component:lazyRouteComponent(()=>import('../routes/OrdersList'),'OrdersList')});
-const checkout=createRoute({getParentRoute:()=>root,path:'/checkout',component:lazyRouteComponent(()=>import('../routes/Checkout'),'Checkout')});
-const orderDetail=createRoute({getParentRoute:()=>root,path:'/account/orders/$orderId',component:lazyRouteComponent(()=>import('../routes/OrderDetail'),'OrderDetail')});
+const orderList=createRoute({getParentRoute:()=>root,path:'/account/orders',component:lazyRouteComponent(()=>import('../routes/Protected'),'ProtectedOrders')});
+const checkout=createRoute({getParentRoute:()=>root,path:'/checkout',component:lazyRouteComponent(()=>import('../routes/Protected'),'ProtectedCheckout')});
+const orderDetail=createRoute({getParentRoute:()=>root,path:'/account/orders/$orderId',component:lazyRouteComponent(()=>import('../routes/Protected'),'ProtectedOrderDetail')});
+const signIn=createRoute({getParentRoute:()=>root,path:'/auth/sign-in',component:lazyRouteComponent(()=>import('../routes/Auth'),'SignIn')});
+const callback=createRoute({getParentRoute:()=>root,path:'/auth/callback',component:lazyRouteComponent(()=>import('../routes/Auth'),'Callback')});
+const authError=createRoute({getParentRoute:()=>root,path:'/auth/error',component:lazyRouteComponent(()=>import('../routes/Auth'),'AuthError')});
+const expired=createRoute({getParentRoute:()=>root,path:'/session-expired',component:lazyRouteComponent(()=>import('../routes/Auth'),'SessionExpired')});
 const legacyList=createRoute({getParentRoute:()=>root,path:'/orders',beforeLoad:({location})=>{throw redirect({to:'/account/orders',search:location.search,hash:location.hash,replace:true})}});
 const legacyCreate=createRoute({getParentRoute:()=>root,path:'/orders/new',beforeLoad:({location})=>{throw redirect({to:'/checkout',search:location.search,hash:location.hash,replace:true})}});
 const legacyDetail=createRoute({getParentRoute:()=>root,path:'/orders/$orderId',beforeLoad:({params,location})=>{throw redirect({to:'/account/orders/$orderId',params:{orderId:params.orderId},search:location.search,hash:location.hash,replace:true})}});
-const tree=root.addChildren([home,products,productDetail,cart,forbidden,offline,adminOrders,accessUsers,accessRoles,accessPermissions,adminProducts,orderList,checkout,orderDetail,legacyList,legacyCreate,legacyDetail]);
+const tree=root.addChildren([home,products,productDetail,cart,forbidden,offline,adminOrders,adminOrderDetail,accessUsers,accessRoles,accessPermissions,adminProducts,orderList,checkout,orderDetail,signIn,callback,authError,expired,legacyList,legacyCreate,legacyDetail]);
 export const createAppRouter=(history?:RouterHistory)=>createRouter({routeTree:tree,history,defaultPreload:'intent',defaultPreloadStaleTime:30_000});
 export const router=createAppRouter();
 declare module '@tanstack/react-router'{interface Register{router:typeof router}}

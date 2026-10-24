@@ -14,3 +14,7 @@ const catalogActual = createHash('sha256').update(catalogDocument).digest('hex')
 if (catalogActual !== catalogExpected) {
   throw new Error(`Catalog OpenAPI export checksum mismatch: expected ${catalogExpected}, received ${catalogActual}.`);
 }
+const identityExpected = 'ab36217b6a6cda66b602f7637c43243a344ca009c8f7616e471b004c5f49a678';
+const identityDocument = await readFile(new URL('../openapi/identity-api.json', import.meta.url));
+const identityActual = createHash('sha256').update(identityDocument).digest('hex');
+if (identityActual !== identityExpected) throw new Error(`Identity OpenAPI export checksum mismatch: expected ${identityExpected}, received ${identityActual}.`);

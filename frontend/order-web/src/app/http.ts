@@ -1,0 +1,17 @@
+export type Violation={field:string;message:string};
+export class ApiProblem extends Error{constructor(public status:number,public code:string,detail:string,public violations:Violation[]=[],public correlationId?:string){super(detail);this.name='ApiProblem'}}
+export class TransportError extends Error{constructor(message='The service could not be reached. Check your connection and try again.',public cause?:unknown){super(message);this.name='TransportError'}}
+type Hooks={token:()=>string|undefined;unauthorized:()=>void;forbidden:()=>Promise<void>|void};
+let hooks:Hooks={token:()=>undefined,unauthorized:()=>{},forbidden:()=>{}};
+export const configureTransport=(next:Partial<Hooks>)=>{hooks={...hooks,...next}};
+const allowed=(url:URL)=>url.origin===(globalThis.location?.origin??url.origin)&&/^\/api\/v[12]\//.test(url.pathname);
+const id=()=>globalThis.crypto?.randomUUID?.()??`${Date.now()}-${Math.random()}`;
+const delay=(signal?:AbortSignal)=>new Promise<void>((resolve,reject)=>{const timer=setTimeout(resolve,120);signal?.addEventListener('abort',()=>{clearTimeout(timer);reject(new DOMException('Aborted','AbortError'))},{once:true})});
+const safe=(value:unknown,fallback:string)=>typeof value==='string'&&value.length<500?value:fallback;
+export async function apiFetch<T>(path:string,init:RequestInit={},options:{base?:string;auth?:boolean;fetcher?:typeof fetch;onUnauthorized?:()=>void;onForbidden?:()=>void|Promise<void>}={}):Promise<T>{
+ const url=new URL(`${options.base??''}${path}`,globalThis.location?.origin??'http://localhost'),correlation=id(),method=(init.method??'GET').toUpperCase();
+ const attempt=async(retry:boolean):Promise<Response>=>{const headers=new Headers(init.headers);headers.set('Accept',headers.get('Accept')??'application/json');headers.set('X-Correlation-ID',correlation);const token=hooks.token();if(options.auth!==false&&token&&allowed(url))headers.set('Authorization',`Bearer ${token}`);let response:Response;try{response=await (options.fetcher??fetch)(options.base?`${options.base}${path}`:url,{...init,headers})}catch(error){if(error instanceof DOMException&&error.name==='AbortError')throw error;if(method==='GET'&&!retry){await delay(init.signal??undefined);return attempt(true)}throw new TransportError(undefined,error)}if(method==='GET'&&!retry&&[502,503,504].includes(response.status)){await delay(init.signal??undefined);return attempt(true)}return response};
+ const response=await attempt(false);if(response.status===401){options.onUnauthorized?.();hooks.unauthorized()}if(response.status===403){await options.onForbidden?.();await hooks.forbidden()}if(response.status===204)return undefined as T;
+ const contentType=response.headers.get('content-type')??'';let body:unknown;try{body=contentType.includes('json')?await response.json():await response.text()}catch{throw new ApiProblem(response.status,'MALFORMED_RESPONSE','The service returned an unreadable response.',[],response.headers.get('X-Correlation-ID')??correlation)}
+ if(!response.ok){const record=body&&typeof body==='object'?body as Record<string,unknown>:{};const violations=Array.isArray(record.violations)?record.violations.filter((v):v is Violation=>!!v&&typeof v==='object'&&typeof (v as Violation).field==='string'&&typeof (v as Violation).message==='string'):[];throw new ApiProblem(response.status,safe(record.code,'HTTP_ERROR'),safe(record.detail,typeof body==='string'&&body?body:`Request failed (${response.status})`),violations,safe(record.correlationId,response.headers.get('X-Correlation-ID')??correlation))}return body as T;
+}
