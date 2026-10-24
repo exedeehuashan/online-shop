@@ -165,6 +165,24 @@ class IdentityPersistenceTest {
         .hasMessageContaining("security audit events are immutable");
   }
 
+  @Test void roleGrantIdempotentlyChangesAndRenewsExpiry() {
+    bootstrap.bootstrap("https://id.example", "admin-1", allPermissions());
+    UUID user = jdbc.queryForObject("select id from sys_user", UUID.class);
+    Instant first = Instant.now().plusSeconds(60).truncatedTo(java.time.temporal.ChronoUnit.MICROS);
+    assignments.grantRole(user, JdbcIdentityBootstrap.ACCESS_ADMIN_ROLE, user, first, UUID.randomUUID());
+    assertThat(jdbc.queryForObject("select expires_at from sys_user_role where user_id=? and role_id=?",
+        java.sql.Timestamp.class, user, JdbcIdentityBootstrap.ACCESS_ADMIN_ROLE).toInstant()).isEqualTo(first);
+    Instant renewed = first.plusSeconds(3600);
+    assignments.grantRole(user, JdbcIdentityBootstrap.ACCESS_ADMIN_ROLE, user, renewed, UUID.randomUUID());
+    assertThat(jdbc.queryForObject("select expires_at from sys_user_role where user_id=? and role_id=?",
+        java.sql.Timestamp.class, user, JdbcIdentityBootstrap.ACCESS_ADMIN_ROLE).toInstant()).isEqualTo(renewed);
+    assignments.grantRole(user, JdbcIdentityBootstrap.ACCESS_ADMIN_ROLE, user, null, UUID.randomUUID());
+    assertThat(jdbc.queryForObject("select expires_at from sys_user_role where user_id=? and role_id=?",
+        java.sql.Timestamp.class, user, JdbcIdentityBootstrap.ACCESS_ADMIN_ROLE)).isNull();
+    assertThat(jdbc.queryForList("select reason_code from security_audit_event where action='ROLE_GRANTED'", String.class))
+        .contains("EXPIRY_UPDATED");
+  }
+
   @Test void simultaneousColdStartBootstrapConvergesForSameSubject() throws Exception {
     runConcurrentBootstrap("admin-1", "admin-1");
     assertThat(jdbc.queryForObject("select count(*) from sys_user", Integer.class)).isOne();
