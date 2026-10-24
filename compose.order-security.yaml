@@ -1,0 +1,47 @@
+# Explicit loopback-only authenticated Order UAT profile. Merge with compose.yaml.
+services:
+  uat-auth:
+    build: {context: ., dockerfile: docker/uat-auth/Dockerfile}
+    environment:
+      UAT_OIDC_ISSUER: http://uat-auth:8080
+      UAT_OIDC_AUDIENCE: online-shop-uat
+      UAT_OIDC_SUBJECT: synthetic-admin
+    ports: ["127.0.0.1:${UAT_AUTH_PORT:-8083}:8080"]
+    networks: [app]
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+  identity-api:
+    build: {context: ., dockerfile: docker/identity-api.Dockerfile}
+    environment:
+      IDENTITY_DB_URL: jdbc:postgresql://postgres:5432/identity?connectTimeout=3&socketTimeout=3
+      IDENTITY_DB_USER: identity_app
+      IDENTITY_DB_PASSWORD: identity_dev_only
+      SPRING_PROFILES_ACTIVE: uat
+      IDENTITY_SECURITY_ENABLED: "true"
+      IDENTITY_OIDC_JWKS_URI: http://uat-auth:8080/jwks
+      IDENTITY_OIDC_ISSUER: http://uat-auth:8080
+      IDENTITY_OIDC_AUDIENCE: online-shop-uat
+      IDENTITY_SYNTHETIC_SEED_ENABLED: "true"
+      IDENTITY_SYNTHETIC_SEED_ISSUER: http://uat-auth:8080
+      IDENTITY_SYNTHETIC_SEED_SUBJECT: synthetic-admin
+    depends_on:
+      postgres: {condition: service_healthy}
+      uat-auth: {condition: service_healthy}
+    networks: [app]
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+  order-api:
+    environment:
+      ORDER_SECURITY_ENABLED: "true"
+      ORDER_OIDC_JWKS_URI: http://uat-auth:8080/jwks
+      ORDER_OIDC_ISSUER: http://uat-auth:8080
+      ORDER_OIDC_AUDIENCE: online-shop-uat
+      ORDER_IDENTITY_BASE_URL: http://identity-api:8080
+    depends_on:
+      postgres: {condition: service_healthy}
+      uat-auth: {condition: service_healthy}
+      identity-api: {condition: service_healthy}

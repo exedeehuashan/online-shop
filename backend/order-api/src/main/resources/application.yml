@@ -16,7 +16,11 @@ springdoc:
     path: /v3/api-docs
 order:
   security:
-    enabled: false
+    enabled: ${ORDER_SECURITY_ENABLED:false}
+    jwk-set-uri: ${ORDER_OIDC_JWKS_URI:}
+    issuer: ${ORDER_OIDC_ISSUER:}
+    audience: ${ORDER_OIDC_AUDIENCE:}
+    identity-base-url: ${ORDER_IDENTITY_BASE_URL:}
 management:
   endpoints:
     web:

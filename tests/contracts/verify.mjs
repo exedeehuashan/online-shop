@@ -7,6 +7,8 @@ for(const document of manifest.documents) {
  if(!document.source) throw new Error(`OpenAPI provenance missing: ${document.path}`);
 }
 const order=JSON.parse(fs.readFileSync('frontend/order-web/openapi/order-api.json','utf8'));
+if(order.paths['/api/v1/customers/{customerId}/orders'].post.operationId!=='create') throw new Error('frozen v1 create operationId must remain create');
+if(order.paths['/api/v2/me/orders'].post.operationId!=='createSelfOrder') throw new Error('v2 self create must use its distinct explicit operationId');
 const catalog=JSON.parse(fs.readFileSync('tests/contracts/catalog-api.json','utf8'));
 const catalogV2=JSON.parse(fs.readFileSync('tests/contracts/catalog-api-v2.json','utf8'));
 const identity=JSON.parse(fs.readFileSync('tests/contracts/identity-api.json','utf8'));

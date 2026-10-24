@@ -4,8 +4,9 @@
 - Candidate branch: `feat/issue-35-order-v2` (TASK-0024)
 - Source endpoint: `GET /v3/api-docs`
 - Export file: `order-api.json` (raw response bytes; no normalization)
-- SHA-256: `98c02540ed53cc5a001dae8b90ed195e19d2ceb879b0f454b6d7d03f1db5a0f7`
-- Size: 11876 bytes
+- Exported after explicitly assigning `createSelfOrder` to the v2 create operation; every baseline v1 operation object was deep-compared with baseline `5c7c5ce528a4c1ac3853b7151cb0c38fc61419e5`.
+- SHA-256: `0e7f989b165110e402bf1359a07fa7281c1f4380371ab67158b9c973a6519f6a`
+- Size: 11883 bytes
 
 The API was started from the exact backend commit and the response body was saved directly. `npm run api:check` verifies this checksum before regenerating types.
 

@@ -13,7 +13,7 @@ export interface paths {
         };
         get: operations["selfList"];
         put?: never;
-        post: operations["create"];
+        post: operations["createSelfOrder"];
         delete?: never;
         options?: never;
         head?: never;
@@ -97,7 +97,7 @@ export interface paths {
          * Create an order
          * @description Returns 201 for the first request and 200 for an identical idempotent replay.
          */
-        post: operations["create_1"];
+        post: operations["create"];
         delete?: never;
         options?: never;
         head?: never;
@@ -326,7 +326,7 @@ export interface operations {
             };
         };
     };
-    create: {
+    createSelfOrder: {
         parameters: {
             query?: never;
             header: {
@@ -499,7 +499,7 @@ export interface operations {
             };
         };
     };
-    create_1: {
+    create: {
         parameters: {
             query?: never;
             header: {

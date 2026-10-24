@@ -7,7 +7,8 @@ case "${1:-}" in
     ids="$(docker compose ps -q)"
     running="$(docker compose ps --status running -q | wc -l | tr -d ' ')"
     unhealthy=0
-    [ "$running" = 4 ] || unhealthy=1
+    expected="$(docker compose config --services | wc -l | tr -d ' ')"
+    [ "$running" = "$expected" ] || unhealthy=1
     for id in $ids; do [ "$(docker inspect -f '{{.State.Health.Status}}' "$id")" = healthy ] || unhealthy=1; done
     [ "$unhealthy" = 0 ] && curl -fsS "http://127.0.0.1:${WEB_PORT:-8080}/health" >/dev/null && exit 0
     i=$((i+1)); sleep 2

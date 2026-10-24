@@ -3,6 +3,7 @@ package com.example.onlineshop.order.api;
 import com.example.onlineshop.order.application.*;
 import com.example.onlineshop.order.domain.*;
 import jakarta.servlet.http.HttpServletRequest;
+import io.swagger.v3.oas.annotations.Operation;
 import java.net.URI;
 import java.util.UUID;
 import org.springframework.http.*;
@@ -17,6 +18,7 @@ class OrderV2Controller {
   }
 
   @PostMapping("/api/v2/me/orders")
+  @Operation(operationId = "createSelfOrder")
   ResponseEntity<OrderController.OrderResponse> create(@RequestHeader("Idempotency-Key")String key,
       @RequestBody OrderController.CreateRequest request,HttpServletRequest http){
     OrderPrincipal principal=access.require("order:read:self");OrderController.validateKey(key);

@@ -133,6 +133,8 @@ class OrderApiTest {
         .andExpect(jsonPath("$.paths['/api/v1/customers/{customerId}/orders/{orderId}/confirmation']").exists())
         .andExpect(jsonPath("$.info.description").value(org.hamcrest.Matchers.containsString("principal-derived v2 ownership")))
         .andExpect(jsonPath("$.paths['/api/v2/me/orders']").exists())
+        .andExpect(jsonPath("$.paths['/api/v2/me/orders'].post.operationId").value("createSelfOrder"))
+        .andExpect(jsonPath("$.paths['/api/v1/customers/{customerId}/orders'].post.operationId").value("create"))
         .andExpect(jsonPath("$.paths['/api/v2/admin/orders']").exists())
         .andExpect(jsonPath("$.security[0].oidcBearer").isArray())
         .andExpect(jsonPath("$.paths['/api/v1/customers/{customerId}/orders'].post.responses['201'].headers.Location").exists())

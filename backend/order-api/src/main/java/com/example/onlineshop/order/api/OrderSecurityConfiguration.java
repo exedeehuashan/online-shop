@@ -49,7 +49,7 @@ class OrderSecurityConfiguration {
                                       ObjectMapper json) throws Exception {
     RestClient identity=RestClient.builder().baseUrl(identityBaseUrl).build();
     return http.csrf(c->c.disable()).sessionManagement(s->s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-      .authorizeHttpRequests(a->a.requestMatchers("/actuator/health").permitAll().requestMatchers("/api/v1/**","/api/v2/**").authenticated().anyRequest().denyAll())
+      .authorizeHttpRequests(a->a.requestMatchers("/actuator/health", "/actuator/health/**").permitAll().requestMatchers("/api/v1/**","/api/v2/**").authenticated().anyRequest().denyAll())
       .oauth2ResourceServer(o->o.jwt(j->{}).authenticationEntryPoint((req,res,e)->problem(req,res,401,"AUTHENTICATION_REQUIRED")))
       .exceptionHandling(e->e.accessDeniedHandler((req,res,x)->problem(req,res,403,"ACCESS_DENIED")))
       .addFilterAfter(new PrincipalFilter(identity), BearerTokenAuthenticationFilter.class).build();
