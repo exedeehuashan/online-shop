@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "environments": [
+    {
+      "key": "env-pr",
+      "name": "Full stack for one commit",
+      "compose": ["compose.yaml"],
+      "services": {
+        "order-api": {"service": "order-api", "port": 8080},
+        "catalog-api": {"service": "catalog-api", "port": 8080}
+      },
+      "apiTests": ["catalog-api-smoke", "order-api-smoke"],
+      "startupTimeoutSeconds": 900,
+      "ttlMinutes": 60
+    }
+  ]
+}
