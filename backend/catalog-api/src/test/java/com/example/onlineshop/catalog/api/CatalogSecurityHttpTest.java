@@ -43,6 +43,7 @@ class CatalogSecurityHttpTest {
   @Autowired MockMvc mvc;
   @Test void publicReadsRemainPublicAndMutationsRequireEffectiveCatalogWrite() throws Exception {
     mvc.perform(get("/api/v1/products")).andExpect(status().isOk());
+    mvc.perform(get("/api/v2/products")).andExpect(status().isOk()).andExpect(header().exists("X-Correlation-ID"));
     mvc.perform(post("/api/v1/products").header("X-Correlation-ID","catalog-test").contentType("application/json").content(product()))
         .andExpect(status().isUnauthorized()).andExpect(content().contentType("application/problem+json"))
         .andExpect(header().string("WWW-Authenticate","Bearer")).andExpect(header().string("X-Correlation-ID","catalog-test"));

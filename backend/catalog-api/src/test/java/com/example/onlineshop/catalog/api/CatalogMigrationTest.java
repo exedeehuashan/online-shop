@@ -52,6 +52,7 @@ class CatalogMigrationTest {
         assertThat(database.queryLong("SELECT count(*) FROM pg_constraint WHERE connamespace=current_schema()::regnamespace "
                 + "AND contype='f' AND confdeltype='a'"))
                 .isZero();
+        assertThat(database.queryLong("SELECT count(*) FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='product_image' AND column_name IN ('width_px','height_px')")).isEqualTo(2);
 
         UUID attribute = UUID.randomUUID();
         UUID value = UUID.randomUUID();
@@ -132,6 +133,8 @@ class CatalogMigrationTest {
                 .isInstanceOf(SQLException.class);
         assertThatThrownBy(() -> database.execute("UPDATE product_sku SET version=-1 WHERE id='" + sku + "'"))
                 .isInstanceOf(SQLException.class);
+        assertThatThrownBy(() -> database.execute("INSERT INTO product_image (id,product_id,url,width_px,created_at,updated_at) VALUES ('"+UUID.randomUUID()+"','"+product+"','/half.png',100,'"+now+"','"+now+"')")).isInstanceOf(SQLException.class);
+        assertThatThrownBy(() -> database.execute("INSERT INTO product_image (id,product_id,url,width_px,height_px,created_at,updated_at) VALUES ('"+UUID.randomUUID()+"','"+product+"','/large.png',32769,10,'"+now+"','"+now+"')")).isInstanceOf(SQLException.class);
 
         database.execute("INSERT INTO product_image "
                 + "(id,product_id,product_sku_id,url,is_primary,created_at,updated_at) VALUES "

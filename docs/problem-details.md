@@ -13,6 +13,14 @@ The requested Catalog UUID does not exist (`PRODUCT_NOT_FOUND`).
 ## malformed-request
 The request syntax, path/header binding, or required header is malformed.
 
+## invalid-catalog-query
+
+Catalog v2 browse parameters failed allow-list, bounds, or referenced-value validation (`INVALID_CATALOG_QUERY`).
+
+## internal-error
+
+An unexpected Catalog v2 read failure occurred (`INTERNAL_ERROR`). The correlation ID can be used for support without exposing internal details.
+
 ## invalid-value
 One or more request values violate semantic validation. The `violations` array contains validation messages.
 
