@@ -1,5 +1,61 @@
 # TASK-0021 Implementation Evidence
 
+## Issue #30 — independent-QA D1/D2 remediation
+
+### Files changed
+
+- `backend/catalog-adapters-persistence/src/main/resources/db/catalog/V4__expand_variant_signature.sql`
+- `backend/catalog-domain/src/main/java/com/example/onlineshop/catalog/domain/CatalogProduct.java`
+- `backend/catalog-adapters-persistence/src/main/java/com/example/onlineshop/catalog/persistence/PostgresProductRepository.java`
+- `backend/catalog-domain/src/test/java/com/example/onlineshop/catalog/domain/CatalogProductTest.java`
+- `backend/catalog-api/src/test/java/com/example/onlineshop/catalog/api/CatalogApiTest.java`
+- `backend/catalog-api/src/test/java/com/example/onlineshop/catalog/api/CatalogMigrationTest.java`
+- `tasks/TASK-0021/implementation.md`
+
+### Implementation summary and technical decisions
+
+- Added forward-only Flyway V4 to widen `product_sku.variant_signature` from `varchar(128)` to
+  `text`. Signatures remain sorted, lossless canonical attribute/value UUID pairs, so existing
+  values and the unique `(product_id, variant_signature)` constraint are preserved without a data
+  rewrite or hash-collision risk.
+- Added an immutable persisted-version baseline to `CatalogProduct`. Saving any existing aggregate,
+  including child-only SKU/assignment/category changes, performs a root CAS against that baseline
+  and advances the aggregate version exactly once. The repository returns the rehydrated aggregate
+  at its new version.
+- The CAS does not infer intent from the mutable current version. Consequently a stale writer whose
+  own lifecycle mutation already incremented its in-memory version still conflicts after another
+  writer commits; optimistic locking is not weakened.
+- Added domain, PostgreSQL persistence, and migration regressions for deterministic lossless
+  147-character two-axis signatures, V3-to-V4 value preservation, child-only stock saves, aggregate
+  version advancement, and stale root-writer rejection.
+
+### Commands and tests executed
+
+- `git diff --check` — PASS.
+- `mvn -B -pl backend/catalog-api -am clean test -DskipTests=false` — PASS: 28 tests
+  (catalog domain 9, architecture 1, API 11, migration 7), 0 failures/errors/skips.
+- `make test-unit` — PASS: foundation/OpenAPI drift; 13-module non-Docker Maven reactor;
+  frontend API generation check, typecheck, lint, 46 unit tests, 8 accessibility tests, production
+  build, and production audit at the high threshold (`found 0 vulnerabilities`; npm install
+  reported one low advisory).
+- `make test-integration test-contracts` — PASS: 48 PostgreSQL/Testcontainers tests
+  (Order persistence 14, Order API 6, Catalog API 11, Catalog migration 7, Identity persistence 10)
+  and all foundation/OpenAPI/generated-client/contract assertions.
+
+### Known limitations and safety
+
+- Independent QA re-verification and exact-SHA CI remain required before merge.
+- No merge, deployment, UAT/production mutation, public exposure, or external database operation
+  was performed. Database tests used disposable Testcontainers PostgreSQL instances only.
+
+## Issue #30 — catalog domain and frozen v1 remediation
+
+- Added persisted product/SKU typed-value assignments and product-category membership, including aggregate rehydration, plus approved attribute flags/validation/display order and category descriptions.
+- Added version-predicate product/SKU updates, domain conflict mapping, guarded DRAFT/ACTIVE/ARCHIVED transitions, aggregate SKU archive cascading, and application-layer lifecycle operations.
+- Added reconciliation-backed readiness health, consistent list totals, axis-only variant signatures with aggregate revalidation, archived-attribute rejection, and preserved whitespace semantics for frozen v1 names.
+- Committed PostgreSQL-backed acceptance tests cover assignment/category persistence, optimistic conflict and archive round-trip, transaction rollback, list totals, audit/no-cross-context-FK checks, readiness failure, golden v1 shape/name behavior, and legacy-backfill v1 equivalence. Domain tests cover lifecycle guards, archive cascading, archived attributes, and reassignment uniqueness.
+- No merge, deployment, production/UAT mutation, or external database operation was performed.
+
 ## Issue #29 — catalog expand schema and legacy backfill
 
 - **Branch:** `feat/issue-29-catalog-schema`

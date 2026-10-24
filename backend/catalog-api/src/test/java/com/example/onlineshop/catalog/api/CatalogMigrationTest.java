@@ -46,6 +46,9 @@ class CatalogMigrationTest {
                 + "AND table_name='products' AND column_name IN "
                 + "('id','name','description','price','currency','stock_quantity','created_at','updated_at')"))
                 .isEqualTo(8);
+        assertThat(database.queryString("SELECT data_type FROM information_schema.columns WHERE table_schema=current_schema() "
+                + "AND table_name='product_sku' AND column_name='variant_signature'"))
+                .isEqualTo("text");
         assertThat(database.queryLong("SELECT count(*) FROM pg_constraint WHERE connamespace=current_schema()::regnamespace "
                 + "AND contype='f' AND confdeltype='a'"))
                 .isZero();
@@ -69,6 +72,33 @@ class CatalogMigrationTest {
                 + attribute + "','TEXT','green','" + now + "','" + now + "')");
         assertThatThrownBy(() -> database.execute("UPDATE product_attribute SET code='shade' WHERE id='" + attribute + "'"))
                 .isInstanceOf(SQLException.class);
+    }
+
+    @Test
+    void variantSignatureExpansionPreservesExistingValuesAndAcceptsTwoAxes() throws Exception {
+        Database database = database("variant_signature");
+        database.flyway("3").migrate();
+        Instant now = Instant.parse("2026-01-01T00:00:00Z");
+        UUID product = UUID.randomUUID();
+        UUID firstSku = UUID.randomUUID();
+        UUID secondSku = UUID.randomUUID();
+        database.execute("INSERT INTO product (id,slug,name,description,status,created_at,updated_at) VALUES "
+                + "('" + product + "','variants','Variants','','ACTIVE','" + now + "','" + now + "')");
+        database.execute("INSERT INTO product_sku "
+                + "(id,product_id,sku,status,price_amount,currency,available_quantity,is_default,variant_signature,created_at,updated_at) VALUES "
+                + "('" + firstSku + "','" + product + "','VARIANT-1','ACTIVE',1.00,'NZD',1,true,'default','" + now + "','" + now + "')");
+
+        database.flyway().migrate();
+
+        String twoAxes = UUID.randomUUID() + "=" + UUID.randomUUID() + ";" + UUID.randomUUID() + "=" + UUID.randomUUID();
+        assertThat(twoAxes).hasSize(147);
+        database.execute("INSERT INTO product_sku "
+                + "(id,product_id,sku,status,price_amount,currency,available_quantity,is_default,variant_signature,created_at,updated_at) VALUES "
+                + "('" + secondSku + "','" + product + "','VARIANT-2','ACTIVE',1.00,'NZD',1,false,'" + twoAxes + "','" + now + "','" + now + "')");
+        assertThat(database.queryString("SELECT variant_signature FROM product_sku WHERE id='" + firstSku + "'"))
+                .isEqualTo("default");
+        assertThat(database.queryString("SELECT variant_signature FROM product_sku WHERE id='" + secondSku + "'"))
+                .isEqualTo(twoAxes);
     }
 
     @Test
