@@ -5,6 +5,7 @@ Modular Java 17/Spring Boot Order and Catalog APIs with a React Order UI. Catalo
 ## Verify
 
 Tests that need Docker (Testcontainers) are tagged `docker`: `make test-unit` excludes them and needs no Docker, `make test-integration` runs only them. `.eahp/qa-suites.json` declares the same two suites for the EAHP QA platform, which reads it at each tested commit.
+The EAHP test platform reads this repository's QA declarations from the `.eahp/` directory (`qa-suites.json`, `api-tests.json`, `environments.json`).
 
 - `make test-unit`: backend clean verify plus frontend drift/type/lint/unit/accessibility/build/audit gates.
 - `make test-foundation`: ADR, convention, module-boundary, and checked-in OpenAPI provenance/drift gates.
