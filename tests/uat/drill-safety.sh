@@ -23,6 +23,9 @@ expect_fail "$S" compare-inventory --expected-inventory "$tmp/expected.json" --a
 grep -q 'order_audit_events' "$S"
 grep -q 'catalog_legacy_reconciliation' "$S"
 grep -q 'security_audit_event' "$S"
+grep -q 'IS DISTINCT FROM' compose.order-security.yaml
+grep -q 'IS DISTINCT FROM' compose.uat-hardened.yaml
+grep -q 'docker compose -p.*restart' tests/uat/restart-persistence.sh
 grep -q 'order by value collate' "$S"
 grep -q -- '--volumes' "$S"
 grep -q 'down;;' "$S"

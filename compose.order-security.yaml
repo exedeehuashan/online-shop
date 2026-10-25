@@ -17,7 +17,9 @@ services:
                 'Isolated full-stack acceptance fixture', 'ACTIVE', false, 0, current_timestamp, current_timestamp)
         ON CONFLICT (id) DO UPDATE
           SET name=EXCLUDED.name, description=EXCLUDED.description, status='ACTIVE', updated_at=current_timestamp
-          WHERE sys_role.code='qa_mutable_role' AND sys_role.system_role=false;
+          WHERE sys_role.code='qa_mutable_role' AND sys_role.system_role=false
+            AND (sys_role.name, sys_role.description, sys_role.status)
+              IS DISTINCT FROM (EXCLUDED.name, EXCLUDED.description, EXCLUDED.status);
         SQL
     depends_on:
       postgres: {condition: service_healthy}

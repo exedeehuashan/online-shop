@@ -31,10 +31,12 @@ mkdir -m 700 -p .uat-evidence/run-20261025
 ```
 
 Validate Flyway histories, frozen v1 probes, current contracts, authenticated UAT and runtime role
-negative DDL checks before switching writers. Never run old and new writers concurrently. Restart
-with `docker compose -p "$target" restart`; normal stop preserves data:
+negative DDL checks before switching writers. Never run old and new writers concurrently. Exercise
+the documented whole-stack Compose restart (including completed one-shot jobs) and assert exact
+stable critical-table checksum equality with:
 
 ```sh
+./tests/uat/restart-persistence.sh "$target"
 ./scripts/uat-drill.sh stop --target-project "$target"
 ./scripts/uat-drill.sh recover --target-project "$recovery" --manifest .uat-evidence/run-20261025/manifest.json
 ```
