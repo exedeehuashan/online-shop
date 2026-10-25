@@ -26,4 +26,20 @@ grep -q 'security_audit_event' "$S"
 grep -q 'order by value collate' "$S"
 grep -q -- '--volumes' "$S"
 grep -q 'down;;' "$S"
+
+# Executable regression for D1: the project is consumed by the wrapper and is not
+# forwarded as an extra Docker Compose argument.
+mkdir "$tmp/bin"
+cat >"$tmp/bin/docker" <<'EOF'
+#!/bin/sh
+printf '%s\n' "$*" >>"$TASK26_DOCKER_LOG"
+exit 0
+EOF
+chmod +x "$tmp/bin/docker"
+TASK26_DOCKER_LOG="$tmp/docker.log" PATH="$tmp/bin:$PATH" "$S" stop --target-project valid-target
+grep -q 'compose -p valid-target -f .*/compose.yaml -f .*/compose.order-security.yaml -f .*/compose.uat-hardened.yaml down' "$tmp/docker.log"
+! grep -q 'compose -p valid-target .* valid-target down' "$tmp/docker.log"
+
+expect_fail "$S" issue-ci-manifest --target-project valid-target --evidence-dir "$tmp/ci" --nonce 1234567890123456
+expect_fail "$S" issue-ci-manifest --target-project ci-task26-safe --evidence-dir "$tmp/ci" --nonce short
 echo 'drill safety tests passed'

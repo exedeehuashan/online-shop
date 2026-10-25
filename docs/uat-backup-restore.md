@@ -8,8 +8,9 @@ Use unique DNS-safe names and explicit collision-free loopback ports. `online-sh
 as a target. PostgreSQL and Identity have no host port; application ports in the Compose files bind
 only to `127.0.0.1`.
 
-For a fresh disposable target, first run migrations with the per-context `*_app` migration owners,
-then merge `compose.uat-hardened.yaml` when starting applications. It disables application Flyway and
+For a fresh disposable target, the hardened overlay runs explicit one-shot `migrate-orders`,
+`migrate-catalog`, and `migrate-identity` jobs with independent `*_migration` logins before the
+applications. It disables application Flyway and
 switches them to DML-only `*_runtime` roles. The checked-in passwords are conspicuously local-only;
 override all of them in a mode-0600 ignored environment file for shared developer hosts.
 
@@ -25,6 +26,7 @@ mkdir -m 700 -p .uat-evidence/run-20261025
 ./scripts/uat-drill.sh preflight --source-project "$src" --target-project "$target"
 ./scripts/uat-drill.sh backup --source-project "$src" --evidence-dir .uat-evidence/run-20261025
 ./scripts/uat-drill.sh restore --target-project "$target" --manifest .uat-evidence/run-20261025/manifest.json
+./scripts/uat-drill.sh upgrade --target-project "$target" --manifest .uat-evidence/run-20261025/manifest.json
 ./scripts/uat-drill.sh verify --target-project "$target" --manifest .uat-evidence/run-20261025/manifest.json
 ```
 
@@ -52,6 +54,10 @@ Cleanup prints and deletes only Compose-labelled exact targets and needs typed c
 ./scripts/uat-drill.sh cleanup --target-project "$target" --confirm "$target"
 ```
 
-CI auto-confirmation is accepted only for generated names beginning `ci-task26-`. Capture resolved
+CI cleanup additionally requires a pre-resource, run-issued ownership manifest and a strong nonce;
+the same nonce must label every Compose container and volume. For example, issue the manifest with
+`issue-ci-manifest`, export matching `UAT_RUN_OWNER`/`UAT_RUN_NONCE` while creating the stack, then
+pass both `--manifest` and `--nonce` to `cleanup --ci-generated`. A name prefix alone is rejected.
+Capture resolved
 Compose configuration, image identities, manifest/checksums, health, contracts, counts and before /
 after Docker inventories as test evidence.
