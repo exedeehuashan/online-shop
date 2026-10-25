@@ -45,3 +45,9 @@ services:
       postgres: {condition: service_healthy}
       uat-auth: {condition: service_healthy}
       identity-api: {condition: service_healthy}
+  web:
+    depends_on:
+      order-api: {condition: service_healthy}
+      catalog-api: {condition: service_healthy}
+      identity-api: {condition: service_healthy}
+      uat-auth: {condition: service_healthy}
