@@ -7,12 +7,18 @@ for(const document of manifest.documents) {
  if(!document.source) throw new Error(`OpenAPI provenance missing: ${document.path}`);
 }
 const order=JSON.parse(fs.readFileSync('frontend/order-web/openapi/order-api.json','utf8'));
+if(order.paths['/api/v1/customers/{customerId}/orders'].post.operationId!=='create') throw new Error('frozen v1 create operationId must remain create');
+if(order.paths['/api/v2/me/orders'].post.operationId!=='createSelfOrder') throw new Error('v2 self create must use its distinct explicit operationId');
 const catalog=JSON.parse(fs.readFileSync('tests/contracts/catalog-api.json','utf8'));
 const catalogV2=JSON.parse(fs.readFileSync('tests/contracts/catalog-api-v2.json','utf8'));
 const identity=JSON.parse(fs.readFileSync('tests/contracts/identity-api.json','utf8'));
 for (const [name,doc,path] of [['order',order,'/api/v1/customers/{customerId}/orders'],['catalog',catalog,'/api/v1/products']]) {
  if (!doc.openapi?.startsWith('3.') || !doc.paths?.[path]) throw new Error(`${name} OpenAPI contract missing ${path}`);
 }
+for (const path of ['/api/v2/me/orders','/api/v2/me/orders/{orderId}','/api/v2/me/orders/{orderId}/confirmation','/api/v2/me/orders/{orderId}/cancellation','/api/v2/admin/orders','/api/v2/admin/orders/{orderId}','/api/v2/admin/orders/{orderId}/confirmation','/api/v2/admin/orders/{orderId}/cancellation'])
+ if (!order.paths?.[path]) throw new Error(`order v2 contract missing ${path}`);
+if (order.paths['/api/v2/admin/orders']?.post) throw new Error('order v2 must not expose admin create');
+if (JSON.stringify(order.security)!==JSON.stringify([{oidcBearer:[]}])) throw new Error('order contract must require bearer authentication globally');
 const expectedCatalogResponses={
  '/api/v1/products':{post:['201','400','422'],get:['200','422']},
  '/api/v1/products/{productId}':{get:['200','400','404']}

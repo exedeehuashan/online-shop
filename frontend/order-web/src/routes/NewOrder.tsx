@@ -2,7 +2,7 @@ import { FormEvent, useMemo, useRef, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import { api, ApiProblem } from '../features/orders/api/client';
-import { customerId, orderKeys } from '../features/orders/api/queries';
+import { orderKeys } from '../features/orders/api/queries';
 import type { CreateOrder, DraftItem } from '../features/orders/model/types';
 import { mergeItemsBySku, validateDraft } from '../features/orders/model/orders';
 
@@ -19,7 +19,7 @@ export function NewOrder() {
   const qc=useQueryClient();
   const rotateKey=()=>{setKey(crypto.randomUUID());setServerError('');};
   const mutation=useMutation({
-    mutationFn:()=>api.create(customerId,draft,key),retry:false,
+    mutationFn:()=>api.create(draft,key),retry:false,
     onSuccess:async order=>{qc.setQueryData(orderKeys.detail(order.id),order);await qc.invalidateQueries({queryKey:orderKeys.list});await navigate({to:'/account/orders/$orderId',params:{orderId:order.id}});},
     onError:error=>{setServerError(error instanceof ApiProblem&&error.status===422?`Order validation failed: ${error.message}`:`Could not create order: ${error.message}`);setTimeout(()=>summary.current?.focus());}
   });

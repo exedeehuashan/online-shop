@@ -12,9 +12,12 @@ import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MissingRequestHeaderException;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.security.access.AccessDeniedException;
 
 @RestControllerAdvice
 class ApiExceptionHandler {
+  @ExceptionHandler(AccessDeniedException.class)
+  ResponseEntity<ProblemDetail> denied(Exception e,HttpServletRequest r){return problem(403,"ACCESS_DENIED","Request denied","Request denied",r);}
   @ExceptionHandler(HttpMessageNotReadableException.class)
   ResponseEntity<ProblemDetail> malformed(Exception e,HttpServletRequest r){return problem(400,"MALFORMED_REQUEST","Malformed request","Request JSON could not be parsed",r);}
   @ExceptionHandler({DomainValidationException.class})
@@ -38,7 +41,8 @@ class ApiExceptionHandler {
     p.setType(URI.create("https://github.com/exedeehuashan/online-shop/blob/main/docs/problem-details.md#"+code.toLowerCase().replace('_','-'))); p.setInstance(URI.create(request.getRequestURI()));
     p.setProperty("code",code);
     p.setProperty("violations",status==422?java.util.List.of(Map.of("field","request","message",detail)):java.util.List.of());
-    p.setProperty("correlationId",request.getHeader("X-Correlation-ID"));
-    return ResponseEntity.status(status).contentType(MediaType.APPLICATION_PROBLEM_JSON).body(p);
+    String correlation=String.valueOf(request.getAttribute(OrderCorrelationFilter.HEADER));
+    p.setProperty("correlationId",correlation);
+    return ResponseEntity.status(status).header(OrderCorrelationFilter.HEADER,correlation).contentType(MediaType.APPLICATION_PROBLEM_JSON).body(p);
   }
 }

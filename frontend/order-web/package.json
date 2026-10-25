@@ -11,8 +11,8 @@
     "test": "vitest run",
     "test:a11y": "vitest run src/test/accessibility.test.tsx",
     "playwright": "playwright test",
-    "api:generate": "openapi-typescript openapi/order-api.json -o src/features/orders/api/generated.ts && openapi-typescript openapi/catalog-api-v2.json -o src/features/catalog/api/generated.ts",
-    "api:check": "node scripts/check-openapi.mjs && npm run api:generate && git diff --exit-code -- openapi/order-api.json openapi/catalog-api-v2.json src/features/orders/api/generated.ts src/features/catalog/api/generated.ts"
+    "api:generate": "openapi-typescript openapi/order-api.json -o src/features/orders/api/generated.ts && openapi-typescript openapi/catalog-api-v2.json -o src/features/catalog/api/generated.ts && openapi-typescript openapi/identity-api.json -o src/features/access/api/generated.ts",
+    "api:check": "node scripts/check-openapi.mjs && npm run api:generate && git diff --exit-code -- openapi/order-api.json openapi/catalog-api-v2.json openapi/identity-api.json src/features/orders/api/generated.ts src/features/catalog/api/generated.ts src/features/access/api/generated.ts"
   },
   "dependencies": {
     "@tanstack/react-query": "5.90.5",

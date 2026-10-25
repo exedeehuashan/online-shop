@@ -21,4 +21,7 @@ identity:
     issuer: ${IDENTITY_BOOTSTRAP_ISSUER:}
     subject: ${IDENTITY_BOOTSTRAP_SUBJECT:}
     permissions: ${IDENTITY_BOOTSTRAP_PERMISSIONS:catalog:read,catalog:write,order:read:self,order:read:any,order:manage,rbac:manage}
-  synthetic-seed.enabled: ${IDENTITY_SYNTHETIC_SEED_ENABLED:false}
+  synthetic-seed:
+    enabled: ${IDENTITY_SYNTHETIC_SEED_ENABLED:false}
+    issuer: ${IDENTITY_SYNTHETIC_SEED_ISSUER:}
+    subject: ${IDENTITY_SYNTHETIC_SEED_SUBJECT:synthetic-admin}

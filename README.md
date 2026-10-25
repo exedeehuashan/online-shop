@@ -26,3 +26,15 @@ make compose-destroy    # destructive: explicitly removes UAT volume
 ```
 
 Endpoints: web `http://127.0.0.1:8080`, Order diagnostics `http://127.0.0.1:8081`, Catalog diagnostics/OpenAPI `http://127.0.0.1:8082/v3/api-docs`. All published ports bind only to loopback. Defaults are disposable local values, not production secrets. Never expose this unauthenticated stack publicly or load real customer data.
+
+## Authenticated Order v2 UAT
+
+The explicit delivered-stack security overlay enables strict Order OIDC/local-principal resolution without storing a private key or token. It is loopback-only and synthetic:
+
+```sh
+make order-security-up order-security-ready
+make test-order-v2-uat
+make order-security-down
+```
+
+Configuration variables, deny-by-default behavior, production guidance, and the generated-token fixture are documented in [docs/order-security.md](docs/order-security.md).

@@ -1,0 +1,81 @@
+# Explicit loopback-only authenticated Order UAT profile. Merge with compose.yaml.
+services:
+  # Acceptance-only, idempotent RBAC fixture. This role is deliberately not assigned to
+  # the synthetic administrator and carries no permissions outside each test's lifetime.
+  uat-rbac-fixture:
+    image: postgres:16-alpine
+    environment:
+      PGPASSWORD: identity_dev_only
+    command:
+      - sh
+      - -ec
+      - |
+        until pg_isready -h postgres -U identity_app -d identity; do sleep 1; done
+        psql -h postgres -U identity_app -d identity -v ON_ERROR_STOP=1 <<'SQL'
+        INSERT INTO sys_role(id, code, name, description, status, system_role, version, created_at, updated_at)
+        VALUES ('30000000-0000-0000-0000-000000000025', 'qa_mutable_role', 'QA mutable role',
+                'Isolated full-stack acceptance fixture', 'ACTIVE', false, 0, current_timestamp, current_timestamp)
+        ON CONFLICT (id) DO UPDATE
+          SET name=EXCLUDED.name, description=EXCLUDED.description, status='ACTIVE', updated_at=current_timestamp
+          WHERE sys_role.code='qa_mutable_role' AND sys_role.system_role=false
+            AND (sys_role.name, sys_role.description, sys_role.status)
+              IS DISTINCT FROM (EXCLUDED.name, EXCLUDED.description, EXCLUDED.status);
+        SQL
+    depends_on:
+      postgres: {condition: service_healthy}
+      identity-api: {condition: service_healthy}
+    networks: [app]
+    restart: "no"
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+  uat-auth:
+    build: {context: ., dockerfile: docker/uat-auth/Dockerfile}
+    environment:
+      UAT_OIDC_ISSUER: http://uat-auth:8080
+      UAT_OIDC_AUDIENCE: online-shop-uat
+      UAT_OIDC_SUBJECT: synthetic-admin
+    ports: ["127.0.0.1:${UAT_AUTH_PORT:-8083}:8080"]
+    networks: [app]
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+  identity-api:
+    build: {context: ., dockerfile: docker/identity-api.Dockerfile}
+    environment:
+      IDENTITY_DB_URL: jdbc:postgresql://postgres:5432/identity?connectTimeout=3&socketTimeout=3
+      IDENTITY_DB_USER: identity_app
+      IDENTITY_DB_PASSWORD: identity_dev_only
+      SPRING_PROFILES_ACTIVE: uat
+      IDENTITY_SECURITY_ENABLED: "true"
+      IDENTITY_OIDC_JWKS_URI: http://uat-auth:8080/jwks
+      IDENTITY_OIDC_ISSUER: http://uat-auth:8080
+      IDENTITY_OIDC_AUDIENCE: online-shop-uat
+      IDENTITY_SYNTHETIC_SEED_ENABLED: "true"
+      IDENTITY_SYNTHETIC_SEED_ISSUER: http://uat-auth:8080
+      IDENTITY_SYNTHETIC_SEED_SUBJECT: synthetic-admin
+    depends_on:
+      postgres: {condition: service_healthy}
+      uat-auth: {condition: service_healthy}
+    networks: [app]
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+  order-api:
+    environment:
+      ORDER_SECURITY_ENABLED: "true"
+      ORDER_OIDC_JWKS_URI: http://uat-auth:8080/jwks
+      ORDER_OIDC_ISSUER: http://uat-auth:8080
+      ORDER_OIDC_AUDIENCE: online-shop-uat
+      ORDER_IDENTITY_BASE_URL: http://identity-api:8080
+    depends_on:
+      postgres: {condition: service_healthy}
+      uat-auth: {condition: service_healthy}
+      identity-api: {condition: service_healthy}
+  web:
+    depends_on:
+      order-api: {condition: service_healthy}
+      catalog-api: {condition: service_healthy}
+      identity-api: {condition: service_healthy}
+      uat-auth: {condition: service_healthy}

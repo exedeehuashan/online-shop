@@ -48,15 +48,22 @@ public final class CreateOrderHandler implements CreateOrderUseCase {
   }
 
   public CreateOrderResult handle(CreateOrderCommand command, String key, String requestHash) {
+    return handle(command, key, requestHash, null, null, null);
+  }
+
+  public CreateOrderResult handle(CreateOrderCommand command, String key, String requestHash, UUID actorId,
+                                  String auditAction, String correlationId) {
     if (idempotency == null) throw new IllegalStateException("idempotency repository is required");
     try {
       CreateOrderResult result = transactions.execute(() -> {
         Order candidate = create(command);
-        orders.save(candidate);
+        if (actorId == null) orders.save(candidate); else orders.save(candidate, actorId);
         IdempotencyClaim claim = idempotency.claim(command.customerReference(), key, requestHash,
             candidate.internalId(), candidate.id(), candidate.createdAt());
         if (claim.disposition() == IdempotencyClaim.Disposition.REPLAY) throw new ReplayDetected(claim.orderId());
         events.appendAll(candidate.domainEvents());
+        if (actorId != null && auditAction != null && orders instanceof OrderAuditRepository audit)
+          audit.append(candidate, actorId, auditAction, candidate.createdAt(), correlationId);
         return new CreateOrderResult(candidate, false);
       });
       result.order().clearDomainEvents();
