@@ -1,0 +1,22 @@
+# Local disposable UAT only. Merge after compose.yaml for newly generated projects/volumes.
+services:
+  postgres:
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./docker/postgres-runtime-roles.sh:/docker-entrypoint-initdb.d/20-runtime-roles.sh:ro
+    tmpfs: [/run/postgresql]
+  order-api:
+    environment:
+      SPRING_FLYWAY_ENABLED: "false"
+      SPRING_DATASOURCE_USERNAME: order_runtime
+      SPRING_DATASOURCE_PASSWORD: order_runtime_local_only
+  catalog-api:
+    environment:
+      SPRING_FLYWAY_ENABLED: "false"
+      CATALOG_DB_USER: catalog_runtime
+      CATALOG_DB_PASSWORD: catalog_runtime_local_only
+  identity-api:
+    environment:
+      SPRING_FLYWAY_ENABLED: "false"
+      IDENTITY_DB_USER: identity_runtime
+      IDENTITY_DB_PASSWORD: identity_runtime_local_only

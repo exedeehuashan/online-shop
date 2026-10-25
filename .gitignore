@@ -2,6 +2,8 @@ target/
 .idea/
 *.iml
 .env
+.uat-evidence/
+.env.uat-local
 tests/**/reports/
 tests/**/results/
 frontend/order-web/node_modules/
